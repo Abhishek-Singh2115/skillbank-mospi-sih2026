@@ -1,0 +1,10 @@
+{
+  "name": "skillbank-mospi",
+  "private": true,
+  "version": "1.0.0",
+  "description": "AI-driven Skill Gap Analyzer and Learning Platform for MoSPI - SIH 2026 Problem Statement 101. Zero-build frontend: index.html loads React/Babel/Tailwind via CDN and compiles JSX in-browser. No Vite build step is required or used.",
+  "scripts": {
+    "dev": "python -m http.server 3000",
+    "serve": "python -m http.server 3000"
+  }
+}
