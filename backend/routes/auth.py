@@ -33,6 +33,7 @@ class AuthUserResponse(BaseModel):
     identified_gaps_count: int = 0
     recent_activity: List[Dict[str, Any]] = Field(default_factory=list)
     is_new_user: bool = False
+    role: str = Field(default="learner", description="RBAC role: 'learner' or 'admin'")
 
 class GoogleLoginResponse(BaseModel):
     user: AuthUserResponse
@@ -172,7 +173,8 @@ async def process_google_credential(credential_str: str) -> GoogleLoginResponse:
         total_modules=int(user_doc.get("total_modules", 18)),
         identified_gaps_count=int(user_doc.get("identified_gaps_count", 0)),
         recent_activity=user_doc.get("recent_activity", []),
-        is_new_user=is_new
+        is_new_user=is_new,
+        role=user_doc.get("role", "learner"),
     )
 
     welcome_msg = (

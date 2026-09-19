@@ -1,6 +1,7 @@
 import json
 import re
 import logging
+from typing import List
 try:
     import google.generativeai as genai
 except Exception as _genai_err:

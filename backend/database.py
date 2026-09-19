@@ -19,7 +19,7 @@ class InMemoryCollection:
                 return dict(doc)
         return None
 
-    async def find(self, filter_query: Optional[Dict[str, Any]] = None):
+    def find(self, filter_query: Optional[Dict[str, Any]] = None):
         filter_query = filter_query or {}
         matching = []
         for doc in self.docs.values():

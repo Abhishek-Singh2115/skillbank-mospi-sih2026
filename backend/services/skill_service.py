@@ -62,6 +62,45 @@ ROLE_BENCHMARKS: Dict[str, dict] = {
             "Communication": "Behavioural & Managerial Competencies",
         }
     },
+    "MoSPI Statistical Cadre Investigator": {
+        "id": "mospi_investigator",
+        "title": "MoSPI Statistical Cadre Investigator",
+        "category": "Public Sector & Governance",
+        "demand_score": "96% Field Operations (MoSPI PS-101)",
+        "required_skills": [
+            "Field Survey Methodology", "Data Verification", "Official Statistics (MoSPI)",
+            "SPSS / R", "Economic Census", "Statistical Auditing", "Data Ethics"
+        ],
+        "skill_domains": {
+            "Field Survey Methodology": "Statistical Competencies",
+            "Data Verification": "Statistical Competencies",
+            "Official Statistics (MoSPI)": "Statistical Competencies",
+            "Economic Census": "Statistical Competencies",
+            "SPSS / R": "Technical Competencies",
+            "Statistical Auditing": "Digital Governance",
+            "Data Ethics": "Behavioural & Managerial Competencies",
+        }
+    },
+    "Public Policy & Governance Analyst": {
+        "id": "public_policy_analyst",
+        "title": "Public Policy & Governance Analyst",
+        "category": "Public Sector & Governance",
+        "demand_score": "93% Policy Priority (MoSPI PS-101)",
+        "required_skills": [
+            "Policy Impact Evaluation", "Quantitative Research", "Stakeholder Consultation",
+            "Econometrics", "Report Writing", "Public Finance Management",
+            "National Accounts Statistics"
+        ],
+        "skill_domains": {
+            "Policy Impact Evaluation": "Statistical Competencies",
+            "Quantitative Research": "Statistical Competencies",
+            "Econometrics": "Statistical Competencies",
+            "National Accounts Statistics": "Statistical Competencies",
+            "Stakeholder Consultation": "Behavioural & Managerial Competencies",
+            "Report Writing": "Behavioural & Managerial Competencies",
+            "Public Finance Management": "Digital Governance",
+        }
+    },
     "Full Stack Web Developer": {
         "id": "fullstack",
         "title": "Full Stack Web Developer",
@@ -139,8 +178,16 @@ class SkillService:
         return skill.strip()
 
     def _match_role(self, target_role_name: str) -> dict:
+        # 1. Exact match (case-insensitive) — always wins
         for role_title, role_data in ROLE_BENCHMARKS.items():
-            if target_role_name.lower() in role_title.lower() or role_title.lower() in target_role_name.lower():
+            if target_role_name.strip().lower() == role_title.strip().lower():
+                return role_data
+        # 2. Substring containment — shorter string inside longer to avoid
+        #    e.g. "Analyst" accidentally matching "Statistical Data Analyst" first
+        name_lower = target_role_name.strip().lower()
+        for role_title, role_data in ROLE_BENCHMARKS.items():
+            title_lower = role_title.strip().lower()
+            if name_lower in title_lower or title_lower in name_lower:
                 return role_data
         return ROLE_BENCHMARKS["MoSPI Statistical Data Analyst"]
 

@@ -47,12 +47,28 @@ async def analyze_skill_gap(request: SkillAnalysisRequest):
 
     response = await skill_service.generate_skill_analysis_response(analysis_req)
 
-    # If user_id was provided, optionally update the user's readiness score in the database
+    # If user_id was provided, persist ALL analysis results to the user's MongoDB document
+    # so that on next login the full profile is restored (target_role, skills, score, gaps).
     if request.user_id:
+        persist_fields = {
+            "target_role": response.target_role,
+            "current_skills": list(response.acquired_skills or []),
+            "missing_skills": list(response.missing_skills or []),
+            "readiness_score": response.readiness_score,
+            "identified_gaps_count": len(response.missing_skills or []),
+        }
+        # Persist official profile fields when provided
+        if request.designation is not None:
+            persist_fields["designation"] = request.designation
+        if request.department is not None:
+            persist_fields["department"] = request.department
+        if request.work_experience_years is not None:
+            persist_fields["work_experience_years"] = request.work_experience_years
+
         users_col = db_manager.get_collection("users")
         await users_col.update_one(
             {"_id": request.user_id},
-            {"$set": {"readiness_score": response.readiness_score}}
+            {"$set": persist_fields}
         )
 
     return response

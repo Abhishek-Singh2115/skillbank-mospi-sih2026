@@ -145,7 +145,7 @@ class IGOTService:
 
     async def get_all_courses(self) -> List[CourseModel]:
         await self.seed_courses()
-        cursor = await self.collection.find({})
+        cursor = self.collection.find({})
         docs = await cursor.to_list(length=100)
         return [CourseModel(**doc) for doc in docs]
 
