@@ -20,23 +20,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
 
-  // ── Helper: decode Google JWT payload locally (base64url → JSON) ──────────
-  const decodeGoogleJwt = (credential) => {
-    try {
-      const parts = credential.split('.');
-      if (parts.length !== 3) throw new Error('Invalid JWT structure');
-      // base64url → base64 → decode
-      const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const json = atob(payload + '=='.slice((payload.length % 4) || 4));
-      return JSON.parse(json);
-    } catch (e) {
-      console.warn('[Auth] JWT local decode failed:', e);
-      return null;
-    }
-  };
 
   // Verify and authenticate Google JWT token with FastAPI backend (/api/auth/google)
-  // Falls back to local JWT decode if backend is unreachable (dev / offline mode)
   const loginWithGoogle = async (credential) => {
     console.log('[Auth] loginWithGoogle called, credential length:', credential?.length);
     setLoading(true);
@@ -62,27 +47,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem("skillbank_token", data.token);
       return data.user;
     } catch (err) {
-      // ── FALLBACK: Backend unavailable — decode Google JWT locally ──────────
-      console.warn('[Auth] Backend unavailable, attempting local JWT fallback. Reason:', err.message);
-      const decoded = decodeGoogleJwt(credential);
-      if (decoded && decoded.email) {
-        const fallbackUser = {
-          name: decoded.name || decoded.email.split('@')[0],
-          email: decoded.email,
-          picture: decoded.picture || null,
-          sub: decoded.sub,
-          _mode: 'offline_fallback',
-        };
-        console.log('[Auth] Local fallback user:', fallbackUser.email, '| name:', fallbackUser.name);
-        setUser(fallbackUser);
-        setToken('local-fallback-token');
-        localStorage.setItem("skillbank_user", JSON.stringify(fallbackUser));
-        localStorage.setItem("skillbank_token", 'local-fallback-token');
-        setAuthError(null); // clear any error — login succeeded via fallback
-        return fallbackUser;
-      }
-      // No fallback possible
-      console.error('[Auth] Google OAuth error (no fallback possible):', err);
+      console.error('[Auth] Google OAuth error:', err);
       setAuthError(err.message || "Failed to sign in with Google. Make sure the backend is running.");
       throw err;
     } finally {
@@ -96,6 +61,12 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("skillbank_user");
     localStorage.removeItem("skillbank_token");
   };
+
+  React.useEffect(() => {
+    const handleLogout = () => logout();
+    window.addEventListener('auth:logout', handleLogout);
+    return () => window.removeEventListener('auth:logout', handleLogout);
+  }, []);
 
   return (
     <AuthContext.Provider value={{

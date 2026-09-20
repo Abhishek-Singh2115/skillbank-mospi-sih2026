@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
-const API_BASE_URL = (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1')
-  ? 'http://127.0.0.1:8000/api'
-  : 'http://localhost:8000/api';
-
+import { apiFetch } from '../utils/apiFetch';
 const MOCK_FALLBACK = {
   _isMock: true,
   total_officials: 124,
@@ -81,7 +79,8 @@ function StatCard({ icon, label, value, sub, iconBg, iconColor, valueColor, barC
   );
 }
 
-export default function AdminDashboard({ setActivePage, showToast }) {
+export default function AdminDashboard({ showToast }) {
+  const navigate = useNavigate();
   const { token } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -94,9 +93,7 @@ export default function AdminDashboard({ setActivePage, showToast }) {
       setLoading(true);
       setAccessDenied(false);
       try {
-        const headers = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`${API_BASE_URL}/admin/overview`, { headers });
+        const res = await apiFetch('/admin/overview');
         if (res.status === 403) {
           if (mounted) { setAccessDenied(true); setLoading(false); }
           return;
@@ -141,7 +138,7 @@ export default function AdminDashboard({ setActivePage, showToast }) {
             </p>
           </div>
           <button
-            onClick={() => setActivePage('dashboard')}
+            onClick={() => navigate('/dashboard')}
             className="px-5 py-2.5 bg-brand-900 hover:bg-brand-800 text-white font-bold text-sm rounded-xl shadow-sm flex items-center gap-2 transition-all"
           >
             <Icon name="arrow-left" size={15} /> Back to Dashboard
@@ -168,7 +165,7 @@ export default function AdminDashboard({ setActivePage, showToast }) {
                 <Icon name="refresh-cw" size={14} /><span>Refresh</span>
               </button>
               <button
-                onClick={() => setActivePage('dashboard')}
+                onClick={() => navigate('/dashboard')}
                 className="px-4 py-2 bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all"
               >
                 <Icon name="arrow-left" size={14} /><span>Dashboard</span>
@@ -183,7 +180,7 @@ export default function AdminDashboard({ setActivePage, showToast }) {
               <div>
                 <p className="text-sm font-bold">Backend unavailable — showing sample data</p>
                 <p className="text-xs mt-0.5 text-amber-800">
-                  Could not reach <code className="font-mono bg-amber-100 px-1 rounded">{API_BASE_URL}/admin/overview</code>.
+                  Could not reach <code className="font-mono bg-amber-100 px-1 rounded">/admin/overview</code>.
                   Start the FastAPI backend and refresh to see live data.
                 </p>
               </div>

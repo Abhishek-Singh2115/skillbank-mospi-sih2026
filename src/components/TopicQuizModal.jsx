@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../config/api';
+import { apiFetch } from '../utils/apiFetch';
 import Icon from './Icon';
 
 // ==========================================
@@ -19,7 +19,7 @@ export default function TopicQuizModal({ topic, onClose, setGlobalApiError, show
     const fetchQuiz = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/quiz/generate-topic`, {
+        const response = await apiFetch('/quiz/generate-topic', {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ topic: topic })
