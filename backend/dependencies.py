@@ -1,35 +1,23 @@
 import logging
 from typing import Dict, Any, Optional
+import jwt
 
 from fastapi import Header, HTTPException, status, Depends
 
 from backend.database import db_manager
+from backend.config import settings
 
 logger = logging.getLogger("skillbank.auth.deps")
-
-# ---------------------------------------------------------------------------
-# Token format produced by auth.py:  google_token_{user_id}
-# We parse the user_id from it and look the user up in the database.
-# ---------------------------------------------------------------------------
-_TOKEN_PREFIX = "google_token_"
-
 
 async def get_current_user(
     authorization: Optional[str] = Header(
         default=None,
-        description=(
-            "Bearer token issued at login. "
-            "Format: 'Bearer google_token_<user_id>'"
-        ),
+        description="Bearer token issued at login."
     )
 ) -> Dict[str, Any]:
     """
     FastAPI dependency -- resolves the Authorization header to a user document.
-
-    Raises:
-        HTTP 401  if the header is missing, malformed, or the user is not found.
     """
-    # ── 1. Parse the raw header ──────────────────────────────────────────────
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -47,23 +35,31 @@ async def get_current_user(
 
     token = parts[1].strip()
 
-    # -- 2. Validate the token structure -------------------------------------
-    if not token.startswith(_TOKEN_PREFIX):
+    try:
+        payload = jwt.decode(token, settings.SESSION_SECRET, algorithms=["HS256"])
+        user_id = payload.get("sub")
+        if not user_id:
+            raise ValueError("Token missing subject claim.")
+    except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unrecognised token format. Please sign in again.",
+            detail="Token has expired. Please sign in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token. Please sign in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except Exception as e:
+        logger.error(f"Token validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token. Please sign in again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_id = token[len(_TOKEN_PREFIX):]
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token does not contain a valid user identifier.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # -- 3. Look up the user in the database ---------------------------------
     collection = db_manager.get_collection("users")
     user_doc = await collection.find_one({"_id": user_id})
 
@@ -80,15 +76,11 @@ async def get_current_user(
 
     return user_doc
 
-
 async def require_admin(
     current_user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     FastAPI dependency -- asserts that the authenticated user has role='admin'.
-
-    Raises:
-        HTTP 403  if the user's role is not 'admin'.
     """
     role = current_user.get("role", "learner")
     if role != "admin":

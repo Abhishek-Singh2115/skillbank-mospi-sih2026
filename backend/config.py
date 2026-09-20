@@ -21,6 +21,9 @@ class Settings(BaseSettings):
 
     # Google OAuth Configuration
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    
+    # JWT Session Secret
+    SESSION_SECRET: str = os.getenv("SESSION_SECRET", "")
 
     # CORS Allowed Origins
     CORS_ORIGINS: list[str] = [
@@ -31,11 +34,16 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:8000",
-        "http://localhost:8000",
-        "*"
+        "http://localhost:8000"
     ]
 
     class Config:
         case_sensitive = True
 
 settings = Settings()
+
+if not settings.GOOGLE_CLIENT_ID:
+    raise ValueError("GOOGLE_CLIENT_ID environment variable is missing or empty. Please configure it in .env.")
+
+if not settings.SESSION_SECRET or len(settings.SESSION_SECRET) < 32:
+    raise ValueError("SESSION_SECRET environment variable is missing or under 32 characters. Please configure it in .env.")

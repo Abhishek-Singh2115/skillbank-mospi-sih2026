@@ -2,8 +2,9 @@ import uuid
 import json
 import base64
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
+import jwt
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, status
 from google.oauth2 import id_token
@@ -40,15 +41,6 @@ class GoogleLoginResponse(BaseModel):
     token: str
     message: str
 
-def _decode_jwt_payload_fallback(jwt_token: str) -> Dict[str, Any]:
-    """Fallback decoder for development / tokens if Google certs are inaccessible."""
-    parts = jwt_token.split(".")
-    if len(parts) >= 2:
-        payload_b64 = parts[1]
-        padded = payload_b64 + "=" * (-len(payload_b64) % 4)
-        decoded_bytes = base64.urlsafe_b64decode(padded)
-        return json.loads(decoded_bytes.decode("utf-8"))
-    raise ValueError("Invalid JWT token format.")
 
 async def process_google_credential(credential_str: str) -> GoogleLoginResponse:
     token_str = credential_str.strip()
@@ -61,11 +53,12 @@ async def process_google_credential(credential_str: str) -> GoogleLoginResponse:
     user_info = None
 
     # Step 1: Verify token with google-auth library
+    if not settings.GOOGLE_CLIENT_ID:
+        raise ValueError("GOOGLE_CLIENT_ID environment variable is missing or empty.")
+
     try:
         req = google_requests.Request()
-        audience = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
-        
-        idinfo = id_token.verify_oauth2_token(token_str, req, audience=audience)
+        idinfo = id_token.verify_oauth2_token(token_str, req, audience=settings.GOOGLE_CLIENT_ID)
         user_info = {
             "email": idinfo.get("email"),
             "name": idinfo.get("name") or idinfo.get("given_name") or "Learner",
@@ -74,22 +67,11 @@ async def process_google_credential(credential_str: str) -> GoogleLoginResponse:
         }
         logger.info(f"Verified Google OAuth token for: {user_info['email']}")
     except Exception as verify_err:
-        logger.warning(f"Google token verification notice: {verify_err}. Utilizing secure token payload decode...")
-        try:
-            fallback_data = _decode_jwt_payload_fallback(token_str)
-            user_info = {
-                "email": fallback_data.get("email"),
-                "name": fallback_data.get("name") or fallback_data.get("given_name") or "Learner",
-                "picture": fallback_data.get("picture"),
-                "sub": fallback_data.get("sub") or str(uuid.uuid4())
-            }
-            logger.info(f"Decoded token payload for user: {user_info['email']}")
-        except Exception as e:
-            logger.error(f"Failed to decode token payload: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid or expired Google OAuth credential: {str(verify_err)}"
-            )
+        logger.error(f"Failed to decode token payload: {verify_err}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google credential"
+        )
 
     if not user_info or not user_info.get("email"):
         raise HTTPException(
@@ -183,9 +165,16 @@ async def process_google_credential(credential_str: str) -> GoogleLoginResponse:
         else f"Welcome back, {auth_user.name}! Your dashboard profile has been loaded."
     )
 
+    token_payload = {
+        "sub": clean_id,
+        "iat": datetime.utcnow(),
+        "exp": datetime.utcnow() + timedelta(hours=8)
+    }
+    jwt_token = jwt.encode(token_payload, settings.SESSION_SECRET, algorithm="HS256")
+
     return GoogleLoginResponse(
         user=auth_user,
-        token=f"google_token_{clean_id}",
+        token=jwt_token,
         message=welcome_msg
     )
 
