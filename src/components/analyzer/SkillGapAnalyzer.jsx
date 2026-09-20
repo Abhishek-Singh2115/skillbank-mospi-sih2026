@@ -5,43 +5,14 @@ import Step2RoleSelection from './Step2RoleSelection';
 import Roadmap from './Roadmap';
 import { ALL_RECOMMENDED_ROLES, TARGET_ROLES, IGOT_COURSES, MOSPI_OFFICIAL_ROLES } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate, useLocation } from 'react-router-dom';
 
-import { apiFetch } from '../../utils/apiFetch';
-export default function SkillGapAnalyzer({ userState, setUserState, showToast, onOpenTopicQuiz, onAnalysisComplete, setGlobalApiError }) {
-  const navigate = useNavigate();
+const API_BASE_URL = (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1')
+      ? 'http://127.0.0.1:8000/api'
+      : 'http://localhost:8000/api';
+
+export default function SkillGapAnalyzer({ setActivePage, userState, setUserState, showToast, onOpenTopicQuiz, onAnalysisComplete, setGlobalApiError }) {
       const { user } = useAuth();
-      const location = useLocation();
-      
-      const [maxUnlockedStep, setMaxUnlockedStep] = useState(() => {
-        return userState?.targetRole ? 4 : 1;
-      });
-
-      const getStepNumber = () => {
-        if (location.pathname.endsWith('/results')) return 4;
-        if (location.pathname.endsWith('/skills')) return 3;
-        if (location.pathname.endsWith('/role')) return 2;
-        return 1;
-      };
-      
-      const currentStep = getStepNumber();
-
-      useEffect(() => {
-        if (location.pathname === '/analyzer' || location.pathname === '/analyzer/') {
-          navigate('/analyzer/degree', { replace: true });
-        } else if (currentStep > maxUnlockedStep) {
-          const paths = ['/analyzer/degree', '/analyzer/role', '/analyzer/skills', '/analyzer/results'];
-          navigate(paths[maxUnlockedStep - 1], { replace: true });
-        }
-      }, [currentStep, maxUnlockedStep, navigate, location.pathname]);
-
-      const handleSetStep = (step) => {
-        if (step > maxUnlockedStep) {
-          setMaxUnlockedStep(step);
-        }
-        const paths = ['/analyzer/degree', '/analyzer/role', '/analyzer/skills', '/analyzer/results'];
-        navigate(paths[step - 1]);
-      };
+      const [currentStep, setCurrentStep] = useState(1);
       const [selectedDegree, setSelectedDegree] = useState(userState?.degree || "");
       const [selectedRole, setSelectedRole] = useState(TARGET_ROLES[0] || {});
       const [knownSkillsList, setKnownSkillsList] = useState(userState?.knownSkills || []);
@@ -97,7 +68,7 @@ export default function SkillGapAnalyzer({ userState, setUserState, showToast, o
           setLoadingDemand(true);
           try {
             const promises = ALL_RECOMMENDED_ROLES.map(role => 
-              apiFetch(`/market/demand?role=${encodeURIComponent(role.title)}`)
+              fetch(`${API_BASE_URL}/market/demand?role=${encodeURIComponent(role.title)}`)
                 .then(res => {
                   if (!res.ok) throw new Error(`HTTP ${res.status}`);
                   return res.json();
@@ -255,7 +226,7 @@ export default function SkillGapAnalyzer({ userState, setUserState, showToast, o
         try {
           const formData = new FormData();
           formData.append("file", file);
-          const res = await apiFetch('/skills/extract-resume', {
+          const res = await fetch(`${API_BASE_URL}/skills/extract-resume`, {
             method: "POST",
             body: formData
           });
@@ -322,7 +293,7 @@ export default function SkillGapAnalyzer({ userState, setUserState, showToast, o
                 : undefined,
             } : {}),
           };
-          const response = await apiFetch('/skills/analyze', {
+          const response = await fetch(`${API_BASE_URL}/skills/analyze`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -337,7 +308,7 @@ export default function SkillGapAnalyzer({ userState, setUserState, showToast, o
           const data = await response.json();
           setBackendAnalysis(data);
           setIsAnalyzing(false);
-          handleSetStep(4);
+          setCurrentStep(4);
 
           // Synchronize user state with FastAPI returned analysis
           const apiResults = {
@@ -384,7 +355,7 @@ export default function SkillGapAnalyzer({ userState, setUserState, showToast, o
 
             setBackendAnalysis(fallbackData);
             setIsAnalyzing(false);
-            handleSetStep(4);
+            setCurrentStep(4);
 
             const fallbackResults = {
               degree: selectedDegree,
@@ -446,7 +417,7 @@ export default function SkillGapAnalyzer({ userState, setUserState, showToast, o
                 <div key={item.step} className="flex flex-col items-center relative z-10">
                   <button
                     onClick={() => {
-                      if (item.step <= maxUnlockedStep) handleSetStep(item.step);
+                      if (item.step < currentStep) setCurrentStep(item.step);
                     }}
                     className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                       currentStep === item.step 
@@ -494,7 +465,7 @@ export default function SkillGapAnalyzer({ userState, setUserState, showToast, o
                 <Step1DegreeSelection
                   selectedDegree={selectedDegree}
                   onSelectDegree={setSelectedDegree}
-                  onNext={() => handleSetStep(2)}
+                  onNext={() => setCurrentStep(2)}
                   officialProfile={officialProfile}
                   onOfficialProfileChange={handleOfficialProfileChange}
                 />
@@ -508,8 +479,8 @@ export default function SkillGapAnalyzer({ userState, setUserState, showToast, o
                   onSelectRole={setSelectedRole}
                   roleDemandMap={roleDemandMap}
                   loadingDemand={loadingDemand}
-                  onBack={() => handleSetStep(1)}
-                  onNext={() => handleSetStep(3)}
+                  onBack={() => setCurrentStep(1)}
+                  onNext={() => setCurrentStep(3)}
                   isOfficialProfile={officialProfile.isOfficial}
                   officialQuickRoles={MOSPI_OFFICIAL_ROLES}
                 />
@@ -661,7 +632,7 @@ export default function SkillGapAnalyzer({ userState, setUserState, showToast, o
 
                   <div className="pt-6 flex justify-between border-t border-slate-100">
                     <button
-                      onClick={() => handleSetStep(2)}
+                      onClick={() => setCurrentStep(2)}
                       className="px-5 py-2.5 border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-50 flex items-center gap-2"
                     >
                       <Icon name="arrow-left" size={15} />
@@ -689,9 +660,9 @@ export default function SkillGapAnalyzer({ userState, setUserState, showToast, o
                   displayCourses={displayCourses}
                   backendAnalysis={backendAnalysis}
                   onOpenTopicQuiz={onOpenTopicQuiz}
-                  
+                  setActivePage={setActivePage}
                   showToast={showToast}
-                  onRestart={() => handleSetStep(1)}
+                  onRestart={() => setCurrentStep(1)}
                 />
               )}
 

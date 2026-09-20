@@ -86,8 +86,8 @@ class MarketService:
                     "job_openings_sample": data["job_openings_sample"],
                     "avg_salary_range": data["avg_salary_range"],
                     "hiring_hotspots": data["hiring_hotspots"],
-                    "source": "Adzuna & MoSPI Labor Intelligence (Standard Matrix)",
-                    "is_live_source": self.has_live_keys
+                    "source": "curated sample data",
+                    "is_live_source": False
                 }
 
         # 2. Dynamic generation for arbitrary custom roles
@@ -120,8 +120,8 @@ class MarketService:
             "job_openings_sample": 5000 + (seed % 10000),
             "avg_salary_range": "₹8.0L - ₹22.0L",
             "hiring_hotspots": ["Bengaluru", "Hyderabad", "Pune", "Delhi NCR"],
-            "source": "Adzuna / Jooble Market Aggregator Engine",
-            "is_live_source": self.has_live_keys
+            "source": "curated sample data",
+            "is_live_source": False
         }
 
 market_service = MarketService()

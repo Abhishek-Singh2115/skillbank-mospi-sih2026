@@ -206,14 +206,8 @@ export default function Dashboard({ setActivePage, userState, showToast, onOpenT
                 <span>iGOT Karmayogi Sync</span>
               </div>
               <p className="text-[11px] text-amber-900/80 leading-relaxed mb-3">
-                Connected with DigiLocker and National Career Service (NCS).
+                iGOT integration: demo catalogue
               </p>
-              <button 
-                onClick={() => showToast("Synced with iGOT Karmayogi API", "success")}
-                className="w-full py-1.5 text-[11px] font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg shadow-2xs transition-all"
-              >
-                Sync Credentials
-              </button>
             </div>
           </div>
         </aside>
