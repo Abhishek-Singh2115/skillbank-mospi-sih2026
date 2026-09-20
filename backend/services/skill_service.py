@@ -1,6 +1,7 @@
 from typing import List, Dict, Tuple
 from backend.models.skill import SkillAnalysisRequest, SkillAnalysisResponse, RoleBenchmark, DomainGap, COMPETENCY_DOMAINS
 from backend.services.igot_service import igot_service
+from backend.services.gemini_service import gemini_service
 
 # Predefined standard role benchmark matrices aligned with MoSPI and National Classification of Occupations (NCO-2015).
 # Each role now tags every required skill with one of the 4 PS-101 competency domains:
@@ -151,6 +152,7 @@ SKILL_ALIASES = {
     "ci/cd": "CI/CD Pipelines",
     "cicd": "CI/CD Pipelines",
     "timeseries": "Time Series Forecasting",
+    "time series": "Time Series Forecasting",
     "sampling": "National Sampling (NSSO)",
     "nsso": "National Sampling (NSSO)",
     "statistics": "Statistical Inference",
@@ -160,17 +162,39 @@ SKILL_ALIASES = {
     "ethics": "Ethics",
     "cybersecurity": "Cybersecurity Awareness",
     "data privacy": "Data Privacy",
+    "tableau": "Tableau / PowerBI",
+    "powerbi": "Tableau / PowerBI",
+    "power bi": "Tableau / PowerBI",
+    "spss": "SPSS / R",
+    "html": "HTML/CSS",
+    "css": "HTML/CSS"
 }
 
 class SkillService:
     def get_all_roles(self) -> List[RoleBenchmark]:
         return [RoleBenchmark(**data) for data in ROLE_BENCHMARKS.values()]
 
-    def normalize_skill(self, skill: str) -> str:
+    def normalize_skill(self, skill: str, target_required_skills: List[str] = None) -> str:
         """Cleans and maps skill string to canonical form using alias dictionary."""
         s = skill.strip().lower()
+        
+        # Check against target role's required skills first
+        if target_required_skills:
+            for req in target_required_skills:
+                req_lower = req.lower()
+                if s == req_lower:
+                    return req
+                # Manual alias overrides for specific required skills
+                if s in ["sampling", "nsso"] and req_lower in ["national sampling (nsso)", "sampling"]: return req
+                if s in ["spss", "r"] and req_lower == "spss / r": return req
+                if s == "r" and req_lower == "r programming": return req
+                if s in ["powerbi", "tableau", "power bi"] and req_lower == "tableau / powerbi": return req
+                if s in ["html", "css"] and req_lower == "html/css": return req
+                if s in ["time series", "timeseries"] and req_lower == "time series forecasting": return req
+        
         if s in SKILL_ALIASES:
             return SKILL_ALIASES[s]
+            
         for role_data in ROLE_BENCHMARKS.values():
             for req in role_data["required_skills"]:
                 if s == req.lower():
@@ -194,22 +218,10 @@ class SkillService:
     def analyze_skills(
         self, target_role_name: str, current_skills: List[str], degree: str = ""
     ) -> Tuple[float, List[str], List[str], List[str]]:
-        """
-        Core skill gap matching algorithm:
-        1. Normalizes user skills.
-        2. Retrieves benchmark required skills for the target role.
-        3. Computes intersection (acquired) and set difference (gaps).
-        4. Calculates competency readiness score.
-
-        NOTE (engineering honesty): this is deterministic alias/keyword matching,
-        not semantic/LLM-based competency inference. Gemini is used elsewhere for
-        quiz generation. Wiring an LLM into this scoring step is a follow-up task,
-        not yet implemented here.
-        """
         matched_role = self._match_role(target_role_name)
 
         required_skills = matched_role["required_skills"]
-        normalized_current = [self.normalize_skill(s) for s in current_skills]
+        normalized_current = [self.normalize_skill(s, required_skills) for s in current_skills]
         normalized_current_lower = {s.lower() for s in normalized_current}
 
         acquired = []
@@ -269,23 +281,14 @@ class SkillService:
 
         recommended_courses = await igot_service.find_courses_for_skills(missing)
 
-        milestones = [
-            {
-                "milestone": "1. Core Foundation Bridge",
-                "focus": missing[0] if len(missing) > 0 else "Foundational Mastery",
-                "action": "Address critical prerequisite deficit via interactive exercises."
-            },
-            {
-                "milestone": "2. Applied Industry Frameworks",
-                "focus": missing[1] if len(missing) > 1 else "Modern Tooling",
-                "action": "Deploy production-grade implementations aligned with MoSPI standards."
-            },
-            {
-                "milestone": "3. Government Capstone & Certification",
-                "focus": "MoSPI Industry Readiness Assessment",
-                "action": "Complete Bloom's taxonomy AI quiz and receive verified digital badge."
-            }
-        ]
+        # Convert DomainGap pydantic models to dicts for the prompt
+        domain_dicts = [d.dict() if hasattr(d, "dict") else vars(d) for d in domain_breakdown]
+        
+        milestones = await gemini_service.generate_learning_roadmap(
+            role_name=role_name,
+            missing_skills=missing,
+            domain_breakdown=domain_dicts
+        )
 
         return SkillAnalysisResponse(
             target_role=role_name,
