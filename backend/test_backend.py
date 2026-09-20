@@ -22,6 +22,22 @@ async def run_tests():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         
+        # Authenticate first
+        print("\n[Auth] Authenticating to get session token...")
+        from unittest.mock import patch
+        with patch("backend.routes.auth.id_token.verify_oauth2_token") as mock_verify:
+            mock_verify.return_value = {
+                "sub": "test_backend_user",
+                "email": "test@mospi.gov.in",
+                "name": "Test Backend User",
+                "picture": "",
+                "hd": "mospi.gov.in"
+            }
+            res_auth = await client.post("/api/auth/google", json={"credential": "mock"})
+            assert res_auth.status_code == 200, "Auth failed"
+            token = res_auth.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
         # Test 1: Root and Health check
         print("\n[Test 1] Testing GET / and GET /api/health...")
         res_root = await client.get("/")
@@ -34,7 +50,7 @@ async def run_tests():
 
         # Test 2: Role benchmarks
         print("\n[Test 2] Testing GET /api/skills/roles...")
-        res_roles = await client.get("/api/skills/roles")
+        res_roles = await client.get("/api/skills/roles", headers=headers)
         assert res_roles.status_code == 200
         roles_data = res_roles.json()
         assert len(roles_data) >= 4
@@ -44,7 +60,7 @@ async def run_tests():
 
         # Test 3: iGOT Karmayogi Courses catalog
         print("\n[Test 3] Testing GET /api/courses...")
-        res_courses = await client.get("/api/courses")
+        res_courses = await client.get("/api/courses", headers=headers)
         assert res_courses.status_code == 200
         courses_data = res_courses.json()
         assert courses_data["total"] > 0
@@ -61,8 +77,8 @@ async def run_tests():
             "current_skills": ["Python", "SQL", "Tableau / PowerBI"],
             "completed_modules": 4
         }
-        res_user = await client.post("/api/users/profile", json=user_payload)
-        assert res_user.status_code == 201, f"User creation failed: {res_user.text}"
+        res_user = await client.put("/api/users/me", json=user_payload, headers=headers)
+        assert res_user.status_code == 200, f"User creation failed: {res_user.text}"
         user_data = res_user.json()
         user_id = user_data["_id"]
         print(f"  [OK] User Profile Created OK: ID={user_id}, Name={user_data['name']}")
@@ -70,9 +86,9 @@ async def run_tests():
 
         # Test 5: Retrieve User Profile
         print("\n[Test 5] Testing GET /api/users/{user_id}...")
-        res_get_user = await client.get(f"/api/users/{user_id}")
+        res_get_user = await client.get(f"/api/users/me", headers=headers)
         assert res_get_user.status_code == 200
-        assert res_get_user.json()["email"] == "priya.patel@sih.gov.in"
+        assert res_get_user.json()["email"] == "test@mospi.gov.in"
         print(f"  [OK] Retrieve User OK: Verified {res_get_user.json()['name']}")
 
         # Test 6: Skill Gap Analyzer Endpoint
@@ -83,7 +99,7 @@ async def run_tests():
             "current_skills": ["Python", "SQL", "Git"],
             "degree": "B.Sc in Statistics & Data Analytics"
         }
-        res_skill = await client.post("/api/skills/analyze", json=skill_payload)
+        res_skill = await client.post("/api/skills/analyze", json=skill_payload, headers=headers)
         assert res_skill.status_code == 200, f"Skill analysis failed: {res_skill.text}"
         analysis_data = res_skill.json()
         print(f"  [OK] Skill Analysis OK:")
@@ -111,7 +127,10 @@ async def run_tests():
         files = {
             "file": ("MoSPI_National_Statistical_Framework_2026.txt", sample_text_document, "text/plain")
         }
-        res_quiz = await client.post("/api/quiz/generate", files=files)
+        from backend.services.gemini_service import FALLBACK_MCQS
+        with patch("backend.services.gemini_service.GeminiService.generate_mcqs_from_text") as mock_gen_mcqs:
+            mock_gen_mcqs.return_value = FALLBACK_MCQS
+            res_quiz = await client.post("/api/quiz/generate", files=files, headers=headers)
         assert res_quiz.status_code == 200, f"Quiz generation failed: {res_quiz.text}"
         quiz_data = res_quiz.json()
         print(f"  [OK] AI Quiz Generator OK:")
@@ -127,7 +146,7 @@ async def run_tests():
 
         # Test 8: Job Market Demand API
         print("\n[Test 8] Testing GET /api/market/demand?role=Full%20Stack%20Web%20Developer...")
-        res_market = await client.get("/api/market/demand", params={"role": "Full Stack Web Developer"})
+        res_market = await client.get("/api/market/demand", params={"role": "Full Stack Web Developer"}, headers=headers)
         assert res_market.status_code == 200, f"Market demand failed: {res_market.text}"
         market_data = res_market.json()
         print(f"  [OK] Market Demand OK:")
@@ -138,7 +157,7 @@ async def run_tests():
 
         # Test 9: Deep Topic Quiz Generation
         print("\n[Test 9] Testing POST /api/quiz/generate-topic with 'Docker'...")
-        res_topic_quiz = await client.post("/api/quiz/generate-topic", json={"topic": "Docker"})
+        res_topic_quiz = await client.post("/api/quiz/generate-topic", json={"topic": "Docker"}, headers=headers)
         assert res_topic_quiz.status_code == 200, f"Topic quiz failed: {res_topic_quiz.text}"
         topic_quiz_data = res_topic_quiz.json()
         print(f"  [OK] Topic Quiz OK:")
@@ -157,7 +176,7 @@ async def run_tests():
         resume_files = {
             "file": ("meet_patidar_resume.txt", sample_resume_content, "text/plain")
         }
-        res_resume = await client.post("/api/skills/extract-resume", files=resume_files)
+        res_resume = await client.post("/api/skills/extract-resume", files=resume_files, headers=headers)
         assert res_resume.status_code == 200, f"Resume extraction failed: {res_resume.text}"
         resume_data = res_resume.json()
         print(f"  [OK] Resume Extraction OK:")
