@@ -1,7 +1,8 @@
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Query, HTTPException, status
+from fastapi import APIRouter, Query, HTTPException, status, Depends
 from pydantic import BaseModel, Field
 from backend.services.market_service import market_service
+from backend.dependencies import get_current_user
 
 router = APIRouter(prefix="/market", tags=["Job Market Analytics"])
 
@@ -21,7 +22,8 @@ class MarketDemandResponse(BaseModel):
 
 @router.get("/demand", response_model=MarketDemandResponse)
 async def get_role_market_demand(
-    role: Optional[str] = Query(None, description="Role title to query market telemetry for")
+    role: Optional[str] = Query(None, description="Role title to query market telemetry for"),
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
     Fetches real-time market demand metrics, trending competencies, and hiring analytics
@@ -31,8 +33,8 @@ async def get_role_market_demand(
     try:
         data = await market_service.get_market_demand(target_role)
         return MarketDemandResponse(**data)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch market demand metrics: {str(e)}"
+            detail="Failed to fetch market demand metrics."
         )

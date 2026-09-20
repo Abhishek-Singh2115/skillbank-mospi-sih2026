@@ -1,75 +1,75 @@
 import uuid
 from datetime import datetime
-from typing import Optional
-from fastapi import APIRouter, HTTPException, status
+from typing import Optional, Dict, Any
+from fastapi import APIRouter, HTTPException, status, Depends
 from backend.models.user import UserProfileCreate, UserProfileResponse, UserProfileUpdate
 from backend.database import db_manager
 from backend.services.skill_service import skill_service
+from backend.dependencies import get_current_user
 
 router = APIRouter(prefix="/users", tags=["Users & Profiles"])
 
-@router.post("/profile", response_model=UserProfileResponse, status_code=status.HTTP_201_CREATED)
-async def create_or_update_profile(profile_data: UserProfileCreate):
+ALLOWED_UPDATE_FIELDS = {
+    "name", "designation", "department", "job_role", 
+    "work_experience_years", "previous_trainings", 
+    "degree", "target_role", "current_skills"
+}
+
+@router.put("/me", response_model=UserProfileResponse)
+async def update_my_profile(
+    profile_data: UserProfileUpdate,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """
-    Create or update a user's profile with their current degree, target job role, and known skills.
-    Automatically computes the user's initial industry readiness score.
+    Update the authenticated user's profile securely.
     """
     collection = db_manager.get_collection("users")
+    user_id = current_user["_id"]
 
-    # Compute industry readiness score for the profile.
-    # For official profiles (designation/department set), default to the
-    # MoSPI Statistical Officer benchmark if no explicit target_role is given.
-    effective_target_role = profile_data.target_role or (
-        "MoSPI Statistical Officer" if profile_data.designation else "MoSPI Statistical Data Analyst"
+    # Filter out disallowed fields
+    update_data = {
+        k: v for k, v in profile_data.dict(exclude_unset=True).items() 
+        if k in ALLOWED_UPDATE_FIELDS
+    }
+    
+    if not update_data:
+        return UserProfileResponse(**current_user)
+
+    # Compute industry readiness score if relevant fields changed
+    # Need to merge existing user data with the update data to run analysis
+    merged_skills = update_data.get("current_skills", current_user.get("current_skills", []))
+    merged_degree = update_data.get("degree", current_user.get("degree", ""))
+    merged_designation = update_data.get("designation", current_user.get("designation", ""))
+    merged_target_role = update_data.get("target_role", current_user.get("target_role", ""))
+
+    effective_target_role = merged_target_role or (
+        "MoSPI Statistical Officer" if merged_designation else "MoSPI Statistical Data Analyst"
     )
+
     readiness_score, _, _, _ = skill_service.analyze_skills(
         target_role_name=effective_target_role,
-        current_skills=profile_data.current_skills,
-        degree=profile_data.degree or ""
+        current_skills=merged_skills,
+        degree=merged_degree
     )
 
-    now = datetime.utcnow()
-    user_dict = profile_data.dict()
-    user_dict["readiness_score"] = readiness_score
-    user_dict["updated_at"] = now
+    update_data["readiness_score"] = readiness_score
+    update_data["updated_at"] = datetime.utcnow()
 
-    # Check if a user with this email or name already exists
-    existing = None
-    if profile_data.email:
-        existing = await collection.find_one({"email": profile_data.email})
-    if not existing:
-        existing = await collection.find_one({"name": profile_data.name})
+    # Never overwrite sensitive fields
+    for field in ["role", "_id", "id", "email", "google_id"]:
+        update_data.pop(field, None)
 
-    if existing:
-        doc_id = str(existing["_id"])
-        await collection.update_one(
-            {"_id": doc_id},
-            {"$set": user_dict}
-        )
-        updated_doc = await collection.find_one({"_id": doc_id})
-        updated_doc["_id"] = str(updated_doc["_id"])
-        return UserProfileResponse(**updated_doc)
-    else:
-        doc_id = str(uuid.uuid4())
-        user_dict["_id"] = doc_id
-        user_dict["created_at"] = now
-        await collection.insert_one(user_dict)
-        return UserProfileResponse(**user_dict)
+    await collection.update_one(
+        {"_id": user_id},
+        {"$set": update_data}
+    )
+    
+    updated_doc = await collection.find_one({"_id": user_id})
+    updated_doc["_id"] = str(updated_doc["_id"])
+    return UserProfileResponse(**updated_doc)
 
-@router.get("/{user_id}", response_model=UserProfileResponse)
-async def get_user_profile(user_id: str):
-    """Retrieves a specific user profile by user ID."""
-    collection = db_manager.get_collection("users")
-    doc = await collection.find_one({"_id": user_id})
-    if not doc:
-        # Also try searching by name or email
-        doc = await collection.find_one({"email": user_id})
-        if not doc:
-            doc = await collection.find_one({"name": user_id})
-    if not doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with identifier '{user_id}' not found."
-        )
-    doc["_id"] = str(doc["_id"])
-    return UserProfileResponse(**doc)
+@router.get("/me", response_model=UserProfileResponse)
+async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Retrieves the authenticated user's profile."""
+    current_user["_id"] = str(current_user["_id"])
+    return UserProfileResponse(**current_user)

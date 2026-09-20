@@ -1,37 +1,34 @@
-from typing import List
-from fastapi import APIRouter, HTTPException, status, UploadFile, File
+import re
+import logging
+from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Depends
 from pydantic import BaseModel
 from backend.models.skill import SkillAnalysisRequest, SkillAnalysisResponse, RoleBenchmark
 from backend.services.skill_service import skill_service
 from backend.services.pdf_service import extract_text_from_pdf
 from backend.services.gemini_service import gemini_service
 from backend.database import db_manager
+from backend.dependencies import get_current_user
 
+logger = logging.getLogger("skillbank.skills")
 router = APIRouter(prefix="/skills", tags=["Skill Gap Analyzer"])
 
 @router.post("/analyze", response_model=SkillAnalysisResponse)
-async def analyze_skill_gap(request: SkillAnalysisRequest):
-    """
-    Core Skill Gap Analysis endpoint:
-    - Accepts user_id OR direct payload with target_role and current_skills.
-    - Evaluates skills against MoSPI / industry role benchmark matrices.
-    - Returns Competency Gap (missing skills) and recommended iGOT Karmayogi courses.
-    """
+async def analyze_skill_gap(
+    request: SkillAnalysisRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     target_role = request.target_role
     current_skills = request.current_skills
     degree = request.degree
+    user_id = current_user["_id"]
 
-    # If user_id is provided, retrieve user profile from database to fill gaps
-    if request.user_id:
-        users_col = db_manager.get_collection("users")
-        user_doc = await users_col.find_one({"_id": request.user_id})
-        if user_doc:
-            if not target_role:
-                target_role = user_doc.get("target_role")
-            if not current_skills:
-                current_skills = user_doc.get("current_skills", [])
-            if not degree:
-                degree = user_doc.get("degree")
+    if not target_role:
+        target_role = current_user.get("target_role")
+    if not current_skills:
+        current_skills = current_user.get("current_skills", [])
+    if not degree:
+        degree = current_user.get("degree")
 
     if not target_role:
         target_role = "MoSPI Statistical Data Analyst"
@@ -39,7 +36,7 @@ async def analyze_skill_gap(request: SkillAnalysisRequest):
         current_skills = []
 
     analysis_req = SkillAnalysisRequest(
-        user_id=request.user_id,
+        user_id=user_id,
         target_role=target_role,
         current_skills=current_skills,
         degree=degree
@@ -47,35 +44,32 @@ async def analyze_skill_gap(request: SkillAnalysisRequest):
 
     response = await skill_service.generate_skill_analysis_response(analysis_req)
 
-    # If user_id was provided, persist ALL analysis results to the user's MongoDB document
-    # so that on next login the full profile is restored (target_role, skills, score, gaps).
-    if request.user_id:
-        persist_fields = {
-            "target_role": response.target_role,
-            "current_skills": list(response.acquired_skills or []),
-            "missing_skills": list(response.missing_skills or []),
-            "readiness_score": response.readiness_score,
-            "identified_gaps_count": len(response.missing_skills or []),
-        }
-        # Persist official profile fields when provided
-        if request.designation is not None:
-            persist_fields["designation"] = request.designation
-        if request.department is not None:
-            persist_fields["department"] = request.department
-        if request.work_experience_years is not None:
-            persist_fields["work_experience_years"] = request.work_experience_years
+    # Persist analysis results to the user's MongoDB document.
+    # We must persist the user's submitted current_skills, not just the matched ones.
+    persist_fields = {
+        "target_role": response.target_role,
+        "current_skills": list(current_skills), # persist what user submitted
+        "missing_skills": list(response.missing_skills or []),
+        "readiness_score": response.readiness_score,
+        "identified_gaps_count": len(response.missing_skills or []),
+    }
+    if request.designation is not None:
+        persist_fields["designation"] = request.designation
+    if request.department is not None:
+        persist_fields["department"] = request.department
+    if request.work_experience_years is not None:
+        persist_fields["work_experience_years"] = request.work_experience_years
 
-        users_col = db_manager.get_collection("users")
-        await users_col.update_one(
-            {"_id": request.user_id},
-            {"$set": persist_fields}
-        )
+    users_col = db_manager.get_collection("users")
+    await users_col.update_one(
+        {"_id": user_id},
+        {"$set": persist_fields}
+    )
 
     return response
 
 @router.get("/roles", response_model=List[RoleBenchmark])
-async def get_role_benchmarks():
-    """Returns the list of all supported target roles and their benchmark skill requirements."""
+async def get_role_benchmarks(current_user: Dict[str, Any] = Depends(get_current_user)):
     return skill_service.get_all_roles()
 
 class ResumeExtractionResponse(BaseModel):
@@ -83,13 +77,16 @@ class ResumeExtractionResponse(BaseModel):
     skills: List[str]
     extracted_count: int
     characters_parsed: int
+    engine: Optional[str] = "gemini"
+    warning: Optional[str] = None
+
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 
 @router.post("/extract-resume", response_model=ResumeExtractionResponse)
-async def extract_skills_from_resume(file: UploadFile = File(...)):
-    """
-    Accepts an uploaded candidate resume / CV (PDF), extracts textual content,
-    and leverages Google Gemini AI to isolate technical competencies and tools.
-    """
+async def extract_skills_from_resume(
+    file: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     if not file.filename.lower().endswith((".pdf", ".txt")):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -97,12 +94,24 @@ async def extract_skills_from_resume(file: UploadFile = File(...)):
         )
 
     try:
-        content = await file.read()
+        content = await file.read(MAX_FILE_SIZE + 1)
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="File exceeds 5MB limit."
+            )
         if len(content) == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Uploaded resume file is empty."
             )
+            
+        if file.filename.lower().endswith(".pdf"):
+            if not content.startswith(b"%PDF"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid PDF file."
+                )
 
         extracted_text = ""
         char_count = 0
@@ -111,7 +120,7 @@ async def extract_skills_from_resume(file: UploadFile = File(...)):
             try:
                 extracted_text, char_count = extract_text_from_pdf(content)
             except Exception as pdf_err:
-                logger.warning(f"pypdf extraction warning for {file.filename}: {pdf_err}. Attempting raw byte decode.")
+                logger.warning(f"pypdf extraction warning for {file.filename}. Attempting raw byte decode.")
                 raw_decoded = content.decode("latin1", errors="ignore")
                 extracted_text = " ".join(re.findall(r'[A-Za-z0-9+#\.\-_/]{3,}', raw_decoded))
                 char_count = len(extracted_text)
@@ -119,31 +128,39 @@ async def extract_skills_from_resume(file: UploadFile = File(...)):
             extracted_text = content.decode("utf-8", errors="ignore")
             char_count = len(extracted_text)
 
+        engine = "gemini"
+        warning = None
+
         if char_count < 15:
-            logger.info(f"Resume {file.filename} yielded minimal text ({char_count} chars). Utilizing foundational tech fallback.")
-            extracted_text = "React TypeScript Node.js Python SQL Docker Git RESTful APIs Linux Tailwind CSS"
-
-        skills = await gemini_service.extract_skills_from_resume_text(extracted_text)
-
-        # Ensure at least a few skills are always returned
-        if not skills:
-            skills = ["Python", "React", "Node.js", "SQL", "Git", "RESTful APIs", "Docker"]
+            logger.info(f"Resume {file.filename} yielded minimal text ({char_count} chars).")
+            skills = []
+            engine = "fallback"
+            warning = "Could not extract enough text from the resume."
+        else:
+            skills = await gemini_service.extract_skills_from_resume_text(extracted_text)
+            if not skills:
+                skills = []
+                engine = "fallback"
+                warning = "No skills were recognized from the provided resume text."
 
         return ResumeExtractionResponse(
             filename=file.filename,
             skills=skills,
             extracted_count=len(skills),
-            characters_parsed=max(char_count, len(extracted_text))
+            characters_parsed=max(char_count, len(extracted_text)),
+            engine=engine,
+            warning=warning
         )
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected resume parse error: {e}. Providing default foundational profile.")
-        default_skills = ["React", "TypeScript", "Node.js", "Python", "SQL", "Docker", "Git"]
+        logger.error(f"Unexpected resume parse error: {e}")
         return ResumeExtractionResponse(
             filename=file.filename,
-            skills=default_skills,
-            extracted_count=len(default_skills),
-            characters_parsed=len(content)
+            skills=[],
+            extracted_count=0,
+            characters_parsed=0,
+            engine="fallback",
+            warning="An unexpected error occurred during processing."
         )
 

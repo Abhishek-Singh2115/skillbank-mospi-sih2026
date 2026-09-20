@@ -96,7 +96,7 @@ async def get_admin_overview(
             domain_distribution=domain_distribution,
             training_completion_rate=completion_rate
         )
-    except Exception as e:
+    except Exception:
         import logging
         logging.exception("Admin overview failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to fetch admin overview.")

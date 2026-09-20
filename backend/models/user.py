@@ -26,9 +26,6 @@ class UserProfileBase(BaseModel):
     current_skills: List[str] = Field(default_factory=list, example=["Python", "SQL", "Git"])
     completed_modules: int = Field(default=0, ge=0, example=14)
 
-    # --- Access control ---
-    role: str = Field(default="learner", example="learner", description="RBAC role: 'learner' or 'admin'")
-
 class UserProfileCreate(UserProfileBase):
     pass
 
@@ -44,10 +41,10 @@ class UserProfileUpdate(BaseModel):
     target_role: Optional[str] = None
     current_skills: Optional[List[str]] = None
     completed_modules: Optional[int] = None
-    role: Optional[str] = None
 
 class UserProfileResponse(UserProfileBase):
     id: str = Field(..., alias="_id", example="66c9f28a9b9a1e001f3c8e4a")
+    role: str = Field(default="learner", example="learner", description="RBAC role: 'learner' or 'admin'")
     readiness_score: float = Field(default=0.0, ge=0.0, le=100.0, example=78.0)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

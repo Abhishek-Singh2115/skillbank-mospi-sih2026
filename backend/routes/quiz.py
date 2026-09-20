@@ -1,19 +1,21 @@
-from typing import List
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
+from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends
 from pydantic import BaseModel, Field
 from backend.models.quiz import QuizGenerationResponse, MCQQuestion
 from backend.services.pdf_service import extract_text_from_pdf
 from backend.services.gemini_service import gemini_service
 from backend.config import settings
+from backend.dependencies import get_current_user
 
 router = APIRouter(prefix="/quiz", tags=["AI Quiz Generator"])
 
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
 @router.post("/generate", response_model=QuizGenerationResponse)
-async def generate_quiz_from_pdf(file: UploadFile = File(...)):
-    """
-    Accepts an uploaded study material document (PDF), extracts curriculum concepts,
-    and leverages Google Gemini API to formulate 5 Bloom's taxonomy MCQs in JSON format.
-    """
+async def generate_quiz_from_pdf(
+    file: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     if not file.filename.lower().endswith((".pdf", ".txt")):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -21,12 +23,24 @@ async def generate_quiz_from_pdf(file: UploadFile = File(...)):
         )
 
     try:
-        content = await file.read()
+        content = await file.read(MAX_FILE_SIZE + 1)
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="File exceeds 5MB limit."
+            )
         if len(content) == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Uploaded file is empty."
             )
+
+        if file.filename.lower().endswith(".pdf"):
+            if not content.startswith(b"%PDF"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid PDF file."
+                )
 
         if file.filename.lower().endswith(".pdf"):
             extracted_text, char_count = extract_text_from_pdf(content)
@@ -41,25 +55,31 @@ async def generate_quiz_from_pdf(file: UploadFile = File(...)):
             )
 
         # Invoke Gemini AI service
-        mcqs = await gemini_service.generate_mcqs_from_text(
-            document_text=extracted_text,
-            document_name=file.filename
-        )
+        try:
+            mcqs = await gemini_service.generate_mcqs_from_text(
+                document_text=extracted_text,
+                document_name=file.filename
+            )
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="AI Quiz generation failed."
+            )
 
         return QuizGenerationResponse(
             document_name=file.filename,
             extracted_characters=char_count,
             questions_count=len(mcqs),
-            source_model=settings.GEMINI_MODEL if gemini_service.api_key_configured else "Mock AI Engine (Configure GEMINI_API_KEY for Live Gemini)",
+            source_model="gemini",
             questions=mcqs
         )
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred while generating the AI quiz: {str(e)}"
+            detail="An unexpected error occurred while generating the AI quiz."
         )
 
 class TopicQuizRequest(BaseModel):
@@ -70,13 +90,13 @@ class TopicQuizResponse(BaseModel):
     questions_count: int
     source_model: str
     questions: List[MCQQuestion]
+    engine: Optional[str] = None
 
 @router.post("/generate-topic", response_model=TopicQuizResponse)
-async def generate_quiz_for_topic(request: TopicQuizRequest):
-    """
-    Instantly formulates 5 Bloom's taxonomy MCQs on a targeted competency gap (e.g. 'Docker', 'PostgreSQL')
-    using Gemini AI to power the interactive testing modal in the Skill Gap Matrix.
-    """
+async def generate_quiz_for_topic(
+    request: TopicQuizRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     clean_topic = request.topic.strip()
     if not clean_topic:
         raise HTTPException(
@@ -85,16 +105,17 @@ async def generate_quiz_for_topic(request: TopicQuizRequest):
         )
 
     try:
-        mcqs = await gemini_service.generate_mcqs_for_topic(clean_topic)
+        mcqs, engine = await gemini_service.generate_mcqs_for_topic(clean_topic)
         return TopicQuizResponse(
             topic=clean_topic,
             questions_count=len(mcqs),
-            source_model=settings.GEMINI_MODEL if gemini_service.api_key_configured else "Intelligent Topic AI Engine",
-            questions=mcqs
+            source_model=engine,
+            questions=mcqs,
+            engine=engine
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate assessment questions for topic '{clean_topic}': {str(e)}"
+            detail="Failed to generate assessment questions for topic."
         )
 
