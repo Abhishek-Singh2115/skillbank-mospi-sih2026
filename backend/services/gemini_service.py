@@ -3,7 +3,7 @@ import re
 import logging
 from typing import List
 try:
-    import google.generativeai as genai
+    from google import genai
 except Exception as _genai_err:
     genai = None
     logging.getLogger("skillbank.gemini").warning(f"Google Generative AI SDK could not be imported ({_genai_err}). Running in resilient fallback mode.")
@@ -90,9 +90,10 @@ FALLBACK_MCQS: List[dict] = [
 class GeminiService:
     def __init__(self):
         self.api_key_configured = False
+        self.client = None
         if genai and settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
             try:
-                genai.configure(api_key=settings.GEMINI_API_KEY.strip())
+                self.client = genai.Client(api_key=settings.GEMINI_API_KEY.strip())
                 self.api_key_configured = True
                 logger.info("Google Gemini API configured successfully.")
             except Exception as e:
@@ -104,8 +105,7 @@ class GeminiService:
         Falls back to curated contextual MCQs if API key is not configured or an error occurs.
         """
         if not self.api_key_configured:
-            logger.info("GEMINI_API_KEY not provided in environment. Utilizing intelligent mock generator.")
-            return [MCQQuestion(**item) for item in FALLBACK_MCQS]
+            raise Exception("GEMINI_API_KEY not provided")
 
         prompt = f"""
 You are an expert curriculum assessor and psychometric evaluation specialist for the Ministry of Statistics and Programme Implementation (MoSPI) and Smart India Hackathon 2026.
@@ -146,8 +146,7 @@ JSON SCHEMA:
 
         try:
             logger.info(f"Dispatching prompt to Gemini model '{settings.GEMINI_MODEL}'...")
-            model = genai.GenerativeModel(settings.GEMINI_MODEL)
-            response = model.generate_content(prompt)
+            response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt)
             raw_text = response.text.strip()
 
             # Strip possible markdown code fences
@@ -173,8 +172,8 @@ JSON SCHEMA:
             return questions
 
         except Exception as e:
-            logger.error(f"Gemini API request or JSON parsing error: {e}. Falling back to curated questions.")
-            return [MCQQuestion(**item) for item in FALLBACK_MCQS]
+            logger.error(f"Gemini API request or JSON parsing error: {e}.")
+            raise
 
     async def extract_skills_from_resume_text(self, resume_text: str) -> List[str]:
         """
@@ -227,8 +226,7 @@ CRITICAL REQUIREMENTS:
 """
         try:
             logger.info(f"Extracting skills from resume using Gemini model '{settings.GEMINI_MODEL}'...")
-            model = genai.GenerativeModel(settings.GEMINI_MODEL)
-            response = model.generate_content(prompt)
+            response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt)
             raw_text = response.text.strip()
 
             cleaned = re.sub(r"^```json\s*", "", raw_text, flags=re.MULTILINE)
@@ -253,7 +251,7 @@ CRITICAL REQUIREMENTS:
                 extracted = ["Python", "React", "Node.js", "SQL", "Git", "RESTful APIs", "Docker"]
             return list(dict.fromkeys(extracted))
 
-    async def generate_mcqs_for_topic(self, topic: str) -> List[MCQQuestion]:
+    async def generate_mcqs_for_topic(self, topic: str) -> tuple[List[MCQQuestion], str]:
         """
         Generates 5 tailored Bloom's taxonomy MCQs on a specific skill or topic
         (e.g., 'Docker', 'PostgreSQL', 'Cloud CI/CD', 'System Architecture').
@@ -264,7 +262,7 @@ CRITICAL REQUIREMENTS:
 
         if not self.api_key_configured:
             logger.info(f"GEMINI_API_KEY not configured. Formulating topic-tailored questions for '{clean_topic}'.")
-            return self._build_topic_fallback_mcqs(clean_topic)
+            return self._build_topic_fallback_mcqs(clean_topic), "template_fallback"
 
         prompt = f"""
 You are an expert psychometric assessment specialist for MoSPI and Smart India Hackathon (SIH 2026).
@@ -288,8 +286,7 @@ CRITICAL REQUIREMENTS:
 """
         try:
             logger.info(f"Requesting 5 MCQs for topic '{clean_topic}' from Gemini API...")
-            model = genai.GenerativeModel(settings.GEMINI_MODEL)
-            response = model.generate_content(prompt)
+            response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt)
             raw_text = response.text.strip()
 
             cleaned = re.sub(r"^```json\s*", "", raw_text, flags=re.MULTILINE)
@@ -309,11 +306,11 @@ CRITICAL REQUIREMENTS:
                     topic=item.get("topic", clean_topic)
                 ))
             if len(questions) >= 3:
-                return questions
+                return questions, "gemini"
             raise ValueError(f"Received only {len(questions)} valid questions.")
         except Exception as e:
             logger.error(f"Gemini topic quiz generation error: {e}. Utilizing topic fallback generator.")
-            return self._build_topic_fallback_mcqs(clean_topic)
+            return self._build_topic_fallback_mcqs(clean_topic), "template_fallback"
 
     def _build_topic_fallback_mcqs(self, topic: str) -> List[MCQQuestion]:
         """Contextually generates 5 questions for common technical gaps or custom skills."""
@@ -576,6 +573,80 @@ CRITICAL REQUIREMENTS:
                     topic=topic
                 )
             ]
+
+
+    async def generate_learning_roadmap(self, role_name: str, missing_skills: List[str], domain_breakdown: List[dict]) -> List[dict]:
+        """
+        Generates a 3-step personalized learning roadmap tailored to the candidate's specific missing skills.
+        """
+        if not self.api_key_configured:
+            logger.info("GEMINI_API_KEY not configured. Falling back to static roadmap templates.")
+            return self._build_fallback_roadmap(missing_skills)
+
+        try:
+            import json
+            breakdown_str = json.dumps(domain_breakdown)
+        except Exception:
+            breakdown_str = str(domain_breakdown)
+
+        prompt = f"""
+You are an expert technical career coach for MoSPI.
+A candidate is targeting the role '{role_name}'.
+They are missing these specific skills: {', '.join(missing_skills) if missing_skills else 'None'}.
+Their domain breakdown is: {breakdown_str}.
+
+Generate exactly 3 tailored roadmap milestones to help them acquire these missing skills.
+CRITICAL REQUIREMENTS:
+1. Return ONLY a valid JSON array of 3 objects.
+2. Each object must have keys: "milestone", "focus", "action".
+3. Do not include markdown code blocks.
+
+JSON SCHEMA:
+[
+  {{
+    "milestone": "1. [Title]",
+    "focus": "[Specific skill or area]",
+    "action": "[Actionable 1-sentence step]"
+  }},
+  ...
+]
+"""
+        try:
+            logger.info(f"Generating personalized roadmap using Gemini model '{settings.GEMINI_MODEL}'...")
+            response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt)
+            raw_text = response.text.strip()
+            
+            cleaned = re.sub(r"^```json\s*", "", raw_text, flags=re.MULTILINE)
+            cleaned = re.sub(r"^```\s*", "", cleaned, flags=re.MULTILINE)
+            cleaned = cleaned.strip()
+
+            parsed_data = json.loads(cleaned)
+            
+            if isinstance(parsed_data, list) and len(parsed_data) >= 3:
+                return parsed_data[:3]
+            raise ValueError("Parsed output was not a valid list of 3 milestones.")
+        except Exception as e:
+            logger.error(f"Gemini roadmap generation failed: {e}. Falling back to static roadmap templates.")
+            return self._build_fallback_roadmap(missing_skills)
+
+    def _build_fallback_roadmap(self, missing: List[str]) -> List[dict]:
+        return [
+            {
+                "milestone": "1. Core Foundation Bridge",
+                "focus": missing[0] if len(missing) > 0 else "Foundational Mastery",
+                "action": "Address critical prerequisite deficit via interactive exercises."
+            },
+            {
+                "milestone": "2. Applied Industry Frameworks",
+                "focus": missing[1] if len(missing) > 1 else "Modern Tooling",
+                "action": "Deploy production-grade implementations aligned with MoSPI standards."
+            },
+            {
+                "milestone": "3. Government Capstone & Certification",
+                "focus": "MoSPI Industry Readiness Assessment",
+                "action": "Complete Bloom's taxonomy AI quiz and receive verified digital badge."
+            }
+        ]
 
 gemini_service = GeminiService()
 
