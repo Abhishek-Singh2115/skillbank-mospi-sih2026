@@ -39,7 +39,7 @@ app = FastAPI(
 # Configure Cross-Origin Resource Sharing (CORS) for React / HTML frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all for local dev to prevent blocking
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
