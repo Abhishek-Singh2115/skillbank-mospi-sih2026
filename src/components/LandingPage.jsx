@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import React, { useState } from 'react';
 import Icon from './Icon';
 import { TARGET_ROLES, MOSPI_OFFICIAL_ROLES, JOB_ROLES_LIST } from '../utils/constants';
@@ -10,7 +11,8 @@ const QUICK_ROLES = [
   { id: "cloud", title: "Cloud & DevOps Architect" }
 ];
 
-export default function LandingPage({ setActivePage, showToast, userState, setUserState, isAuthenticated, setAuthModalOpen }) {
+export default function LandingPage({ showToast, userState, setUserState, isAuthenticated, setAuthModalOpen }) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = React.useRef(null);
@@ -88,7 +90,7 @@ export default function LandingPage({ setActivePage, showToast, userState, setUs
       }
       setSearchQuery(result.label);
       setIsDropdownOpen(false);
-      setActivePage('analyzer');
+      undefined;
     });
   };
 
@@ -110,7 +112,7 @@ export default function LandingPage({ setActivePage, showToast, userState, setUs
         readinessScore: undefined,
         missingSkills: []
       }));
-      setActivePage('analyzer');
+      undefined;
       showToast(`Target role set to: ${roleTitle}`);
     });
   };
@@ -166,7 +168,7 @@ export default function LandingPage({ setActivePage, showToast, userState, setUs
                   if (searchQuery.trim()) {
                     setUserState(prev => ({ ...prev, degree: searchQuery }));
                   }
-                  setActivePage('analyzer');
+                  undefined;
                 })}
                 className="w-full sm:w-auto px-6 py-3 rounded-xl bg-brand-900 hover:bg-brand-800 text-white font-bold text-sm shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
               >
@@ -312,7 +314,7 @@ export default function LandingPage({ setActivePage, showToast, userState, setUs
             </div>
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-brand-900 group-hover:text-blue-600">
               <span
-                onClick={() => requireAuth(() => setActivePage('analyzer'))}
+                onClick={() => requireAuth(() => undefined)}
                 className="cursor-pointer flex items-center gap-1"
               >
                 Try Competency Mapper <Icon name="chevron-right" size={14} />
@@ -337,7 +339,7 @@ export default function LandingPage({ setActivePage, showToast, userState, setUs
             </div>
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-600 group-hover:text-amber-700">
               <span
-                onClick={() => requireAuth(() => setActivePage('quiz'))}
+                onClick={() => requireAuth(() => undefined)}
                 className="cursor-pointer flex items-center gap-1"
               >
                 Launch Quiz Generator <Icon name="chevron-right" size={14} />
@@ -362,7 +364,7 @@ export default function LandingPage({ setActivePage, showToast, userState, setUs
             </div>
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-600 group-hover:text-emerald-700">
               <span
-                onClick={() => requireAuth(() => setActivePage('analyzer'))}
+                onClick={() => requireAuth(() => undefined)}
                 className="cursor-pointer flex items-center gap-1"
               >
                 View iGOT Pathways <Icon name="chevron-right" size={14} />
@@ -430,14 +432,14 @@ export default function LandingPage({ setActivePage, showToast, userState, setUs
             </p>
             <div className="flex flex-wrap gap-4">
               <button
-                onClick={() => requireAuth(() => setActivePage('analyzer'))}
+                onClick={() => requireAuth(() => undefined)}
                 className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm shadow-lg transition-all active:scale-95 flex items-center gap-2"
               >
                 <span>Start Gap Analysis Now</span>
                 <Icon name="arrow-right" size={16} />
               </button>
               <button
-                onClick={() => requireAuth(() => setActivePage('dashboard'))}
+                onClick={() => requireAuth(() => undefined)}
                 className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl text-sm backdrop-blur-sm transition-all flex items-center gap-2 border border-white/20"
               >
                 <span>Explore Sample Dashboard</span>

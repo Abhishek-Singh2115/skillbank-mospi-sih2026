@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import Header from './components/Header'
 import Dashboard from './components/Dashboard'
 import LandingPage from './components/LandingPage'
@@ -9,7 +10,6 @@ import SkillGapAnalyzer from './components/analyzer/SkillGapAnalyzer'
 import AdminDashboard from './components/AdminDashboard'
 import QuizPage from './components/QuizPage'
 
-// Empty initial state — populated only after real Google Sign-In + Skill Analyzer run
 const EMPTY_USER_STATE = {
   name: null,
   email: null,
@@ -25,11 +25,30 @@ const EMPTY_USER_STATE = {
   recentActivity: [],
 };
 
+// ProtectedRoute component defined outside App to prevent remounting
+const ProtectedRoute = ({ isAuthenticated, hasCompletedAnalysis, requireAnalysis, showToast, setAuthModalOpen, children }) => {
+  useEffect(() => {
+    if (!isAuthenticated) {
+      showToast('🔒 Please sign in first to access this feature.');
+      setAuthModalOpen(true);
+    } else if (requireAnalysis && !hasCompletedAnalysis) {
+      showToast('📊 Complete the Skill Analyzer first to unlock your Dashboard.');
+    }
+  }, [isAuthenticated, requireAnalysis, hasCompletedAnalysis, showToast, setAuthModalOpen]);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+  if (requireAnalysis && !hasCompletedAnalysis) {
+    return <Navigate to="/analyzer" replace />;
+  }
+  return children;
+};
+
 function App() {
   const { isAuthenticated, user } = useAuth()
+  const navigate = useNavigate()
 
-  // Always start on landing — dashboard is only accessible after skill analysis
-  const [activePage, setActivePage] = useState('landing')
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [topicQuizTopic, setTopicQuizTopic] = useState(null)
   const [toastMessage, setToastMessage] = useState(null)
@@ -86,33 +105,13 @@ function App() {
     console.log('[App] Sign out — resetting session state');
     setHasCompletedAnalysis(false)
     setUserState(EMPTY_USER_STATE)
-    setActivePage('landing')
     setTopicQuizTopic(null)
-  }, [])
-
-  // Guard: navigate to a page only if authenticated (and for dashboard, only if analysis done)
-  const handleNavigation = useCallback((page) => {
-    if (page === 'landing') {
-      setActivePage('landing')
-      return
-    }
-    if (!isAuthenticated) {
-      showToast('🔒 Please sign in first to access this feature.')
-      setAuthModalOpen(true)
-      return
-    }
-    if (page === 'dashboard' && !hasCompletedAnalysis) {
-      showToast('📊 Complete the Skill Analyzer first to unlock your Dashboard.')
-      setActivePage('analyzer')
-      return
-    }
-    setActivePage(page)
-  }, [isAuthenticated, hasCompletedAnalysis, showToast])
+    navigate('/')
+  }, [navigate])
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header
-        setActivePage={handleNavigation}
         setAuthModalOpen={setAuthModalOpen}
         hasCompletedAnalysis={hasCompletedAnalysis}
         onSignOut={handleSignOut}
@@ -126,47 +125,77 @@ function App() {
       )}
       
       <main className="flex-grow">
-      {/* Page routing */}
-      {activePage === 'landing' ? (
-        <LandingPage
-          setActivePage={handleNavigation}
-          setAuthModalOpen={setAuthModalOpen}
-          isAuthenticated={isAuthenticated}
-          userState={userState}
-          setUserState={setUserState}
-          showToast={showToast}
-        />
-      ) : activePage === 'dashboard' ? (
-        <Dashboard
-          setActivePage={handleNavigation}
-          userState={userState}
-          showToast={showToast}
-          onOpenTopicQuiz={handleOpenTopicQuiz}
-          setAuthModalOpen={setAuthModalOpen}
-        />
-      ) : activePage === 'analyzer' ? (
-        <SkillGapAnalyzer
-          setActivePage={handleNavigation}
-          userState={userState}
-          setUserState={setUserState}
-          showToast={showToast}
-          onOpenTopicQuiz={handleOpenTopicQuiz}
-          onAnalysisComplete={handleAnalysisComplete}
-          setGlobalApiError={(err) => console.error("API Error:", err)}
-        />
-      ) : activePage === 'quiz' ? (
-        <QuizPage
-          setActivePage={handleNavigation}
-          showToast={showToast}
-          onOpenTopicQuiz={(topic) => setTopicQuizTopic(topic)}
-          userState={userState}
-        />
-      ) : activePage === 'admin' ? (
-        <AdminDashboard
-          setActivePage={handleNavigation}
-          showToast={showToast}
-        />
-      ) : null}
+      <Routes>
+        <Route path="/" element={
+          <LandingPage
+            setAuthModalOpen={setAuthModalOpen}
+            isAuthenticated={isAuthenticated}
+            userState={userState}
+            setUserState={setUserState}
+            showToast={showToast}
+          />
+        } />
+        <Route path="/dashboard" element={
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            hasCompletedAnalysis={hasCompletedAnalysis}
+            requireAnalysis
+            showToast={showToast}
+            setAuthModalOpen={setAuthModalOpen}
+          >
+            <Dashboard
+              userState={userState}
+              showToast={showToast}
+              onOpenTopicQuiz={handleOpenTopicQuiz}
+              setAuthModalOpen={setAuthModalOpen}
+            />
+          </ProtectedRoute>
+        } />
+        <Route path="/analyzer/*" element={
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            hasCompletedAnalysis={hasCompletedAnalysis}
+            showToast={showToast}
+            setAuthModalOpen={setAuthModalOpen}
+          >
+            <SkillGapAnalyzer
+              userState={userState}
+              setUserState={setUserState}
+              showToast={showToast}
+              onOpenTopicQuiz={handleOpenTopicQuiz}
+              onAnalysisComplete={handleAnalysisComplete}
+              setGlobalApiError={(err) => console.error("API Error:", err)}
+            />
+          </ProtectedRoute>
+        } />
+        <Route path="/quiz" element={
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            hasCompletedAnalysis={hasCompletedAnalysis}
+            showToast={showToast}
+            setAuthModalOpen={setAuthModalOpen}
+          >
+            <QuizPage
+              showToast={showToast}
+              onOpenTopicQuiz={(topic) => setTopicQuizTopic(topic)}
+              userState={userState}
+            />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin" element={
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            hasCompletedAnalysis={hasCompletedAnalysis}
+            showToast={showToast}
+            setAuthModalOpen={setAuthModalOpen}
+          >
+            <AdminDashboard
+              showToast={showToast}
+            />
+          </ProtectedRoute>
+        } />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
 
       {/* Sign-In Modal */}
       <SignInModal
@@ -193,10 +222,11 @@ function App() {
           if (loggedInUser.target_role) {
             setHasCompletedAnalysis(true);
             showToast(`Welcome back, ${loggedInUser.name}! 🎉 Your dashboard is ready.`);
+            navigate('/dashboard');
           } else {
             showToast(`Welcome, ${loggedInUser.name}! 🎉 Start with the Skill Analyzer.`);
+            navigate('/analyzer');
           }
-          setActivePage('landing');
         }}
       />
 

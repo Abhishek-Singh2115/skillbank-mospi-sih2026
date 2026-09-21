@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Icon from './Icon';
 import SkillRadarChart from './SkillRadarChart';
@@ -8,8 +9,9 @@ import { apiFetch } from '../utils/apiFetch';
 // ==========================================
 // NATIONAL SKILLING COMMAND CENTER — DASHBOARD
 // ==========================================
-export default function Dashboard({ setActivePage, userState, showToast, onOpenTopicQuiz, setAuthModalOpen }) {
+export default function Dashboard({ userState, showToast, onOpenTopicQuiz, setAuthModalOpen }) {
   const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
   const [sidebarTab, setSidebarTab] = useState('overview');
 
   // --- DYNAMIC RADAR: axes derived from the user's actual target role skills ---
@@ -139,7 +141,7 @@ export default function Dashboard({ setActivePage, userState, showToast, onOpenT
               </button>
 
               <button
-                onClick={() => setActivePage('analyzer')}
+                onClick={() => navigate('/analyzer')}
                 className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-brand-900 transition-all"
               >
                 <div className="flex items-center gap-2.5">
@@ -150,7 +152,7 @@ export default function Dashboard({ setActivePage, userState, showToast, onOpenT
               </button>
 
               <button
-                onClick={() => setActivePage('quiz')}
+                onClick={() => navigate('/quiz')}
                 className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-brand-900 transition-all"
               >
                 <div className="flex items-center gap-2.5">
@@ -205,7 +207,7 @@ export default function Dashboard({ setActivePage, userState, showToast, onOpenT
 
               {user?.role === 'admin' && (
                 <button
-                  onClick={() => setActivePage('admin')}
+                  onClick={() => navigate('/admin')}
                   className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all"
                 >
                   <div className="flex items-center gap-2.5">
@@ -253,7 +255,7 @@ export default function Dashboard({ setActivePage, userState, showToast, onOpenT
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setActivePage('analyzer')}
+                onClick={() => navigate('/analyzer')}
                 className="px-4 py-2 bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all"
               >
                 <Icon name="refresh-cw" size={14} />
@@ -408,7 +410,7 @@ export default function Dashboard({ setActivePage, userState, showToast, onOpenT
                           </div>
                           <p className="text-[11px] text-slate-600 mb-2">Identified as a key gap for your target role by the MoSPI competency matrix.</p>
                           <button
-                            onClick={() => onOpenTopicQuiz ? onOpenTopicQuiz(skill) : setActivePage('quiz')}
+                            onClick={() => onOpenTopicQuiz ? onOpenTopicQuiz(skill) : navigate('/quiz')}
                             className="text-[11px] font-bold text-blue-700 hover:text-blue-900 flex items-center gap-1"
                           >
                             Generate AI Quiz on {skill.split(' ')[0]} <Icon name="arrow-right" size={12} />
@@ -487,7 +489,7 @@ export default function Dashboard({ setActivePage, userState, showToast, onOpenT
               })()}
 
               <button
-                onClick={() => setActivePage('analyzer')}
+                onClick={() => navigate('/analyzer/results')}
                 className="w-full mt-4 py-2.5 rounded-xl bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1.5"
               >
                 <span>Open Detailed Roadmap</span>

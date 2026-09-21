@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Icon from './Icon';
 
-export default function Header({ setActivePage, setAuthModalOpen, hasCompletedAnalysis, onSignOut }) {
+export default function Header({ setAuthModalOpen, hasCompletedAnalysis, onSignOut }) {
   const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -24,7 +26,7 @@ export default function Header({ setActivePage, setAuthModalOpen, hasCompletedAn
     if (onSignOut) {
       onSignOut();      // resets App-level state: hasCompletedAnalysis, userState, activePage
     } else {
-      setActivePage('landing');
+      navigate('/');
     }
   };
 
@@ -35,7 +37,7 @@ export default function Header({ setActivePage, setAuthModalOpen, hasCompletedAn
           {/* LOGO */}
           <div 
             className="flex items-center gap-2 cursor-pointer"
-            onClick={() => setActivePage('landing')}
+            onClick={() => navigate('/')}
           >
             <div className="w-8 h-8 rounded-lg bg-brand-900 text-amber-400 flex items-center justify-center font-bold">
               <Icon name="layers" size={18} />
@@ -49,7 +51,7 @@ export default function Header({ setActivePage, setAuthModalOpen, hasCompletedAn
           <nav className="hidden md:flex items-center gap-6">
             {/* Home — always accessible */}
             <button 
-              onClick={() => setActivePage('landing')} 
+              onClick={() => navigate('/')} 
               className="text-sm font-semibold text-slate-600 hover:text-brand-900 transition-colors"
             >
               Home
@@ -57,7 +59,7 @@ export default function Header({ setActivePage, setAuthModalOpen, hasCompletedAn
 
             {/* Skill Analyzer — requires login */}
             <button 
-              onClick={() => setActivePage('analyzer')} 
+              onClick={() => navigate('/analyzer')} 
               className={`flex items-center gap-1 text-sm font-semibold transition-colors ${
                 isAuthenticated
                   ? 'text-slate-600 hover:text-brand-900'
@@ -71,7 +73,7 @@ export default function Header({ setActivePage, setAuthModalOpen, hasCompletedAn
 
             {/* Dashboard — requires login + completed analysis */}
             <button 
-              onClick={() => setActivePage('dashboard')} 
+              onClick={() => navigate('/dashboard')} 
               className={`flex items-center gap-1 text-sm font-semibold transition-colors ${
                 isAuthenticated && hasCompletedAnalysis
                   ? 'text-slate-600 hover:text-brand-900'
@@ -85,7 +87,7 @@ export default function Header({ setActivePage, setAuthModalOpen, hasCompletedAn
 
             {/* AI Quiz — requires login */}
             <button 
-              onClick={() => setActivePage('quiz')} 
+              onClick={() => navigate('/quiz')} 
               className={`flex items-center gap-1 text-sm font-semibold transition-colors ${
                 isAuthenticated
                   ? 'text-slate-600 hover:text-brand-900'
@@ -149,14 +151,14 @@ export default function Header({ setActivePage, setAuthModalOpen, hasCompletedAn
                     {/* Menu items */}
                     <div className="py-1.5">
                       <button
-                        onClick={() => { setActivePage('dashboard'); setDropdownOpen(false); }}
+                        onClick={() => { navigate('/dashboard'); setDropdownOpen(false); }}
                         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                       >
                         <Icon name="layout-dashboard" size={14} className="text-brand-900" />
                         My Dashboard
                       </button>
                       <button
-                        onClick={() => { setActivePage('analyzer'); setDropdownOpen(false); }}
+                        onClick={() => { navigate('/analyzer'); setDropdownOpen(false); }}
                         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                       >
                         <Icon name="sparkles" size={14} className="text-amber-500" />

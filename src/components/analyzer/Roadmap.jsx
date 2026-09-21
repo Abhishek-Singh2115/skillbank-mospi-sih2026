@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import React, { useMemo, useState } from 'react';
 import Icon from '../Icon';
 import { IGOT_COURSES } from '../../utils/constants';
@@ -51,10 +52,10 @@ export default function Roadmap({
       displayCourses,
       backendAnalysis,
       onOpenTopicQuiz,
-      setActivePage,
       showToast,
       onRestart
     }) {
+      const navigate = useNavigate();
       const { user } = useAuth();
       const [isExporting, setIsExporting] = useState(false);
 
@@ -216,7 +217,7 @@ export default function Roadmap({
         if (onOpenTopicQuiz) {
           onOpenTopicQuiz(cluster.title);
         } else {
-          setActivePage('quiz');
+          navigate('/quiz');
           showToast(`Launching AI Cluster Assessment for ${cluster.title}...`, "info");
         }
       };
@@ -766,7 +767,7 @@ export default function Roadmap({
             </button>
 
             <button
-              onClick={() => setActivePage('dashboard')}
+              onClick={() => navigate('/dashboard')}
               className="px-6 py-2.5 bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-2 transition-all active:scale-95 shadow-blue-900/20"
             >
               <span>Go to Learning Dashboard</span>

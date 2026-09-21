@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import React, { useState } from "react";
 import Icon from "./Icon";
 import TopicQuizModal from "./TopicQuizModal";
@@ -111,7 +112,8 @@ const DIFFICULTY_COLORS = {
   Advanced: "text-rose-700 bg-rose-50 border-rose-200",
 };
 
-export default function QuizPage({ setActivePage, showToast, userState }) {
+export default function QuizPage({ showToast, userState }) {
+  const navigate = useNavigate();
   const [activeTopic, setActiveTopic] = useState(null);
 
   // Dynamic Topics Logic
@@ -168,7 +170,7 @@ export default function QuizPage({ setActivePage, showToast, userState }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setActivePage("dashboard")}
+            onClick={() => navigate("dashboard")}
             className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-all"
           >
             <Icon name="arrow-left" size={18} />

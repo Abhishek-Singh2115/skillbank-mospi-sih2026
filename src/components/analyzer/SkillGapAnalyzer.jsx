@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Icon from '../Icon';
 import Step1DegreeSelection from '../Step1DegreeSelection';
 import Step2RoleSelection from './Step2RoleSelection';
@@ -11,12 +12,23 @@ const API_BASE_URL = (typeof window !== 'undefined' && window.location.hostname 
       ? 'http://127.0.0.1:8000/api'
       : 'http://localhost:8000/api';
 
-export default function SkillGapAnalyzer({ setActivePage, userState, setUserState, showToast, onOpenTopicQuiz, onAnalysisComplete, setGlobalApiError }) {
+export default function SkillGapAnalyzer({ userState, setUserState, showToast, onOpenTopicQuiz, onAnalysisComplete, setGlobalApiError }) {
       const { user } = useAuth();
-      const [currentStep, setCurrentStep] = useState(() => {
-        if (userState?.forceStep) return userState.forceStep;
-        return (userState?.targetRole && userState?.readinessScore !== undefined) ? 4 : 1;
-      });
+      const navigate = useNavigate();
+      const location = useLocation();
+
+      // Derive step from URL
+      let currentStep = 1;
+      if (location.pathname.endsWith('/role')) currentStep = 2;
+      else if (location.pathname.endsWith('/skills')) currentStep = 3;
+      else if (location.pathname.endsWith('/results')) currentStep = 4;
+
+      const getStepPath = (step) => {
+        if (step === 1) return '/analyzer';
+        if (step === 2) return '/analyzer/role';
+        if (step === 3) return '/analyzer/skills';
+        return '/analyzer/results';
+      };
       const [selectedDegree, setSelectedDegree] = useState(userState?.degree || "");
       const [selectedRole, setSelectedRole] = useState(() => {
         if (userState?.targetRole) {
@@ -61,6 +73,14 @@ export default function SkillGapAnalyzer({ setActivePage, userState, setUserStat
       // Dynamic Market Demand States
       const [roleDemandMap, setRoleDemandMap] = useState({});
       const [loadingDemand, setLoadingDemand] = useState(true);
+
+      // Fallback logic for direct URL access without state
+      useEffect(() => {
+        if (currentStep > 1 && !selectedDegree && !userState?.targetRole && !officialProfile.isOfficial) {
+          showToast("Please complete your profile first.");
+          navigate('/analyzer', { replace: true });
+        }
+      }, [currentStep, selectedDegree, userState, officialProfile.isOfficial, navigate, showToast]);
 
       // Resume CV Upload States
       const [isUploadingResume, setIsUploadingResume] = useState(false);
@@ -319,7 +339,7 @@ export default function SkillGapAnalyzer({ setActivePage, userState, setUserStat
           const data = await response.json();
           setBackendAnalysis(data);
           setIsAnalyzing(false);
-          setCurrentStep(4);
+          navigate('/analyzer/results');
 
           // Synchronize user state with FastAPI returned analysis
           const apiResults = {
@@ -366,7 +386,7 @@ export default function SkillGapAnalyzer({ setActivePage, userState, setUserStat
 
             setBackendAnalysis(fallbackData);
             setIsAnalyzing(false);
-            setCurrentStep(4);
+            navigate('/analyzer/results');
 
             const fallbackResults = {
               degree: selectedDegree,
@@ -428,7 +448,7 @@ export default function SkillGapAnalyzer({ setActivePage, userState, setUserStat
                 <div key={item.step} className="flex flex-col items-center relative z-10">
                   <button
                     onClick={() => {
-                      if (item.step < currentStep) setCurrentStep(item.step);
+                      if (item.step < currentStep) navigate(getStepPath(item.step));
                     }}
                     className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                       currentStep === item.step 
@@ -476,7 +496,7 @@ export default function SkillGapAnalyzer({ setActivePage, userState, setUserStat
                 <Step1DegreeSelection
                   selectedDegree={selectedDegree}
                   onSelectDegree={setSelectedDegree}
-                  onNext={() => setCurrentStep(2)}
+                  onNext={() => navigate('/analyzer/role')}
                   officialProfile={officialProfile}
                   onOfficialProfileChange={handleOfficialProfileChange}
                 />
@@ -490,8 +510,8 @@ export default function SkillGapAnalyzer({ setActivePage, userState, setUserStat
                   onSelectRole={setSelectedRole}
                   roleDemandMap={roleDemandMap}
                   loadingDemand={loadingDemand}
-                  onBack={() => setCurrentStep(1)}
-                  onNext={() => setCurrentStep(3)}
+                  onBack={() => navigate('/analyzer')}
+                  onNext={() => navigate('/analyzer/skills')}
                   isOfficialProfile={officialProfile.isOfficial}
                   officialQuickRoles={MOSPI_OFFICIAL_ROLES}
                 />
@@ -643,7 +663,7 @@ export default function SkillGapAnalyzer({ setActivePage, userState, setUserStat
 
                   <div className="pt-6 flex justify-between border-t border-slate-100">
                     <button
-                      onClick={() => setCurrentStep(2)}
+                      onClick={() => navigate('/analyzer/role')}
                       className="px-5 py-2.5 border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-50 flex items-center gap-2"
                     >
                       <Icon name="arrow-left" size={15} />
@@ -671,9 +691,8 @@ export default function SkillGapAnalyzer({ setActivePage, userState, setUserStat
                   displayCourses={displayCourses}
                   backendAnalysis={backendAnalysis}
                   onOpenTopicQuiz={onOpenTopicQuiz}
-                  setActivePage={setActivePage}
                   showToast={showToast}
-                  onRestart={() => setCurrentStep(1)}
+                  onRestart={() => navigate('/analyzer')}
                 />
               )}
 

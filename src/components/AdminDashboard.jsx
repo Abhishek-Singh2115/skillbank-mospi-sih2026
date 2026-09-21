@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 import { useAuth } from '../context/AuthContext';
@@ -77,7 +78,8 @@ function StatCard({ icon, label, value, sub, iconBg, iconColor, valueColor, barC
   );
 }
 
-export default function AdminDashboard({ setActivePage, showToast }) {
+export default function AdminDashboard({ showToast }) {
+  const navigate = useNavigate();
   const { token } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -135,7 +137,7 @@ export default function AdminDashboard({ setActivePage, showToast }) {
             </p>
           </div>
           <button
-            onClick={() => setActivePage('dashboard')}
+            onClick={() => undefined}
             className="px-5 py-2.5 bg-brand-900 hover:bg-brand-800 text-white font-bold text-sm rounded-xl shadow-sm flex items-center gap-2 transition-all"
           >
             <Icon name="arrow-left" size={15} /> Back to Dashboard
@@ -162,7 +164,7 @@ export default function AdminDashboard({ setActivePage, showToast }) {
                 <Icon name="refresh-cw" size={14} /><span>Refresh</span>
               </button>
               <button
-                onClick={() => setActivePage('dashboard')}
+                onClick={() => undefined}
                 className="px-4 py-2 bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all"
               >
                 <Icon name="arrow-left" size={14} /><span>Dashboard</span>
