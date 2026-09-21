@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import Icon from '../Icon';
 import { IGOT_COURSES } from '../../utils/constants';
+import { useAuth } from '../../context/AuthContext';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import RoadmapPDFTemplate from './RoadmapPDFTemplate';
 
 // PS-101 4-domain visual style map — keyed by the official domain name returned by /api/skills/analyze
 const DOMAIN_STYLES = {
@@ -51,6 +55,41 @@ export default function Roadmap({
       showToast,
       onRestart
     }) {
+      const { user } = useAuth();
+      const [isExporting, setIsExporting] = useState(false);
+
+      const handleExportPDF = async () => {
+        const templateNode = document.getElementById('pdf-export-template');
+        if (!templateNode) return;
+        
+        setIsExporting(true);
+        showToast("Generating PDF... Please wait.");
+        
+        try {
+          const canvas = await html2canvas(templateNode, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+          });
+          
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'px',
+            format: [canvas.width, canvas.height]
+          });
+          
+          pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+          pdf.save(`${user?.name ? user.name.replace(/\s+/g, '_') : 'Career'}_Roadmap.pdf`);
+          showToast("Roadmap PDF exported successfully!", "success");
+        } catch (error) {
+          console.error("PDF generation failed:", error);
+          showToast("Failed to generate PDF. Please try again.", "error");
+        } finally {
+          setIsExporting(false);
+        }
+      };
+
       // 1. Build domain clusters — PRIMARY: real PS-101 domain_breakdown from /api/skills/analyze
       //    FALLBACK: keyword-based clustering using official PS-101 domain names (when backend offline)
       const domainClusters = useMemo(() => {
@@ -562,11 +601,12 @@ export default function Roadmap({
               </div>
 
               <button
-                onClick={() => showToast("Roadmap & Learning Checklist downloaded successfully.", "success")}
-                className="self-start sm:self-auto px-4 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 shadow-2xs transition-all active:scale-95"
+                onClick={handleExportPDF}
+                disabled={isExporting}
+                className="self-start sm:self-auto px-4 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Icon name="download" size={14} />
-                <span>Export Career Roadmap</span>
+                {isExporting ? <Icon name="loader-2" size={14} className="animate-spin" /> : <Icon name="download" size={14} />}
+                <span>{isExporting ? 'Generating PDF...' : 'Export Career Roadmap'}</span>
               </button>
             </div>
 
@@ -733,6 +773,15 @@ export default function Roadmap({
               <Icon name="arrow-right" size={15} />
             </button>
           </div>
+
+          <RoadmapPDFTemplate 
+            user={user}
+            targetRole={selectedRole?.title}
+            readinessScore={displayScore}
+            verifiedKnown={verifiedKnown}
+            domainClusters={domainClusters}
+            careerPhases={careerPhases}
+          />
         </div>
       );
     }

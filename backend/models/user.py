@@ -25,6 +25,7 @@ class UserProfileBase(BaseModel):
     target_role: Optional[str] = Field(None, example="MoSPI Statistical Data Analyst")
     current_skills: List[str] = Field(default_factory=list, example=["Python", "SQL", "Git"])
     completed_modules: int = Field(default=0, ge=0, example=14)
+    enrolled_courses: List[str] = Field(default_factory=list, example=["IGOT-CS-101"])
 
 class UserProfileCreate(UserProfileBase):
     pass

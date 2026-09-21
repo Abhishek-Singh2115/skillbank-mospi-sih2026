@@ -1,0 +1,726 @@
+
+Filename                 LineNumber Line
+--------                 ---------- ----
+config.py                        18     # Google Gemini AI Configuration
+config.py                        19     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+config.py                        20     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+config.py                        22     # Google OAuth Configuration
+database.py                      11     """Async-compatible in-memory collection mock for testing and demonstration."""
+database.py                      91             await self.client.admin.command('ping')
+dependencies.py                   8 logger = logging.getLogger("skillbank.auth.deps")
+dependencies.py                  11 # Token format produced by auth.py:  google_token_{user_id}
+dependencies.py                  14 _TOKEN_PREFIX = "google_token_"
+dependencies.py                  18     authorization: Optional[str] = Header(
+dependencies.py                  21             "Bearer token issued at login. "
+dependencies.py                  22             "Format: 'Bearer google_token_<user_id>'"
+dependencies.py                  27     FastAPI dependency -- resolves the Authorization header to a user document.
+dependencies.py                  33     if not authorization:
+dependencies.py                  35             status_code=status.HTTP_401_UNAUTHORIZED,
+dependencies.py                  36             detail="Authorization header missing. Please sign in.",
+dependencies.py                  37             headers={"WWW-Authenticate": "Bearer"},
+dependencies.py                  40     parts = authorization.split(" ", 1)
+dependencies.py                  43             status_code=status.HTTP_401_UNAUTHORIZED,
+dependencies.py                  44             detail="Invalid Authorization header. Expected: Bearer <token>",
+dependencies.py                  45             headers={"WWW-Authenticate": "Bearer"},
+dependencies.py                  48     token = parts[1].strip()
+dependencies.py                  50     # -- 2. Validate the token structure -------------------------------------
+dependencies.py                  51     if not token.startswith(_TOKEN_PREFIX):
+dependencies.py                  53             status_code=status.HTTP_401_UNAUTHORIZED,
+dependencies.py                  54             detail="Unrecognised token format. Please sign in again.",
+dependencies.py                  55             headers={"WWW-Authenticate": "Bearer"},
+dependencies.py                  58     user_id = token[len(_TOKEN_PREFIX):]
+dependencies.py                  61             status_code=status.HTTP_401_UNAUTHORIZED,
+dependencies.py                  62             detail="Token does not contain a valid user identifier.",
+dependencies.py                  63             headers={"WWW-Authenticate": "Bearer"},
+dependencies.py                  73             f"(token may be stale or from a different environment)"
+dependencies.py                  76             status_code=status.HTTP_401_UNAUTHORIZED,
+dependencies.py                  78             headers={"WWW-Authenticate": "Bearer"},
+dependencies.py                  84 async def require_admin(
+dependencies.py                  88     FastAPI dependency -- asserts that the authenticated user has role='admin'.
+dependencies.py                  91         HTTP 403  if the user's role is not 'admin'.
+dependencies.py                  93     role = current_user.get("role", "learner")
+dependencies.py                  94     if role != "admin":
+dependencies.py                  96             f"require_admin: FORBIDDEN -- user '{current_user.get('email', 'unknown…
+dependencies.py                  97             f"(role='{role}') attempted to access an admin-only resource."
+dependencies.py                 101             detail="Access denied. Administrator role required for this resource.",
+main.py                           7 from backend.routes import users_router, skills_router, quiz_router, courses_router…
+main.py                           8 from backend.services.igot_service import igot_service
+main.py                          22     # Pre-seed default mock iGOT courses
+main.py                          23     seeded_count = await igot_service.seed_courses()
+main.py                          24     logger.info(f"iGOT Karmayogi catalog verified with {seeded_count} courses.")
+main.py                          49 app.include_router(auth_router, prefix=settings.API_V1_STR)
+main.py                          55 app.include_router(admin_router, prefix=settings.API_V1_STR)
+main.py                          73         "gemini_ai": "live" if bool(settings.GEMINI_API_KEY) else "mock_engine_acti…
+test_backend.py                  33         print(f"  [OK] Health OK: Database={res_health.json()['database']}, Gemini=…
+test_backend.py                  35         # Test 2: Role benchmarks
+test_backend.py                  36         print("\n[Test 2] Testing GET /api/skills/roles...")
+test_backend.py                  37         res_roles = await client.get("/api/skills/roles")
+test_backend.py                  38         assert res_roles.status_code == 200
+test_backend.py                  39         roles_data = res_roles.json()
+test_backend.py                  40         assert len(roles_data) >= 4
+test_backend.py                  41         print(f"  [OK] Roles OK: Found {len(roles_data)} benchmark matrices:")
+test_backend.py                  42         for r in roles_data:
+test_backend.py                  45         # Test 3: iGOT Karmayogi Courses catalog
+test_backend.py                  51         print(f"  [OK] iGOT Courses OK: {courses_data['total']} courses loaded.")
+test_backend.py                  60             "target_role": "MoSPI Statistical Data Analyst",
+test_backend.py                  82             "target_role": "MoSPI Statistical Data Analyst",
+test_backend.py                  90         print(f"    - Target Role: {analysis_data['target_role']}")
+test_backend.py                  94         print(f"    - Matched iGOT Courses: {len(analysis_data['recommended_courses…
+test_backend.py                 103             "Section 1: Multi-Stage Stratified Sampling in NSSO Rounds.\n"
+test_backend.py                 104             "Stratified random sampling divides diverse demographic populations int…
+test_backend.py                 129         print("\n[Test 8] Testing GET /api/market/demand?role=Full%20Stack%20Web%20…
+test_backend.py                 130         res_market = await client.get("/api/market/demand", params={"role": "Full S…
+test_backend.py                 134         print(f"    - Role: {market_data['role']}")
+__init__.py                       3 from backend.models.skill import SkillAnalysisRequest, SkillAnalysisResponse, RoleB…
+__init__.py                      14     "RoleBenchmark",
+course.py                         5     id: str = Field(..., example="IGOT-STAT-204")
+course.py                         8     description: str = Field(..., example="Official MoSPI curriculum on national sa…
+course.py                         9     link: str = Field(..., example="https://igotkarmayogi.gov.in/course/IGOT-STAT-2…
+course.py                        10     provider: str = Field(default="iGOT Karmayogi / MoSPI", example="National Stati…
+course.py                        15     tpac_recommended: bool = Field(default=False, description="Recommended under NS…
+skill.py                         15     target_role: Optional[str] = Field(None, example="MoSPI Statistical Data Analys…
+skill.py                         25 class RoleBenchmark(BaseModel):
+skill.py                         31     # skill -> domain mapping for this role, e.g. {"Survey Design": "Statistical Co…
+skill.py                         41     target_role: str
+skill.py                         44     acquired_skills: List[str] = Field(..., description="Skills already mastered ma…
+skill.py                         46     supplementary_skills: List[str] = Field(default_factory=list, description="Extr…
+skill.py                         47     recommended_courses: List[CourseModel] = Field(..., description="iGOT Karmayogi…
+user.py                           7     title: str = Field(..., example="Foundations of National Sample Survey (NSSTA)")
+user.py                           9     provider: Optional[str] = Field(None, example="NSSTA")
+user.py                          18     job_role: Optional[str] = Field(None, example="MoSPI Statistical Data Analyst")
+user.py                          25     target_role: Optional[str] = Field(None, example="MoSPI Statistical Data Analys…
+user.py                          30     role: str = Field(default="learner", example="learner", description="RBAC role:…
+user.py                          40     job_role: Optional[str] = None
+user.py                          44     target_role: Optional[str] = None
+user.py                          47     role: Optional[str] = None
+__init__.py                       6 from backend.routes.auth import router as auth_router
+__init__.py                       7 from backend.routes.admin import router as admin_router
+__init__.py                      15     "auth_router",
+__init__.py                      16     "admin_router"
+admin.py                          8 from backend.dependencies import require_admin
+admin.py                         10 router = APIRouter(prefix="/admin", tags=["Administrator Dashboard"])
+admin.py                         19 class AdminOverviewResponse(BaseModel):
+admin.py                         28 @router.get("/overview", response_model=AdminOverviewResponse)
+admin.py                         29 async def get_admin_overview(
+admin.py                         30     _admin_user: Dict[str, Any] = Depends(require_admin),
+admin.py                         33     Organization-wide insights for the Administrator dashboard (PS-101 requirement):
+admin.py                         48             return AdminOverviewResponse(
+admin.py                         67             target_role = u.get("target_role") or u.get("job_role") or "MoSPI Stati…
+admin.py                         69             _, acquired, missing, _ = skill_service.analyze_skills(target_role, cur…
+admin.py                         73             breakdown = skill_service.build_domain_breakdown(target_role, acquired,…
+admin.py                         91         return AdminOverviewResponse(
+admin.py                        101         logging.exception("Admin overview failed")
+auth.py                           9 from google.oauth2 import id_token
+auth.py                          10 from google.auth.transport import requests as google_requests
+auth.py                          15 logger = logging.getLogger("skillbank.auth")
+auth.py                          16 router = APIRouter(prefix="/auth", tags=["Authentication & Google OAuth"])
+auth.py                          19     credential: str = Field(..., description="Google OAuth ID token JWT string retu…
+auth.py                          21 class AuthUserResponse(BaseModel):
+auth.py                          27     target_role: str = ""
+auth.py                          36     role: str = Field(default="learner", description="RBAC role: 'learner' or 'admi…
+auth.py                          39     user: AuthUserResponse
+auth.py                          40     token: str
+auth.py                          43 def _decode_jwt_payload_fallback(jwt_token: str) -> Dict[str, Any]:
+auth.py                          44     """Fallback decoder for development / tokens if Google certs are inaccessible."…
+auth.py                          45     parts = jwt_token.split(".")
+auth.py                          51     raise ValueError("Invalid JWT token format.")
+auth.py                          54     token_str = credential_str.strip()
+auth.py                          55     if not token_str:
+auth.py                          58             detail="Missing Google OAuth credential token."
+auth.py                          63     # Step 1: Verify token with google-auth library
+auth.py                          68         idinfo = id_token.verify_oauth2_token(token_str, req, audience=audience)
+auth.py                          75         logger.info(f"Verified Google OAuth token for: {user_info['email']}")
+auth.py                          77         logger.warning(f"Google token verification notice: {verify_err}. Utilizing …
+auth.py                          79             fallback_data = _decode_jwt_payload_fallback(token_str)
+auth.py                          86             logger.info(f"Decoded token payload for user: {user_info['email']}")
+auth.py                          88             logger.error(f"Failed to decode token payload: {e}")
+auth.py                          90                 status_code=status.HTTP_401_UNAUTHORIZED,
+auth.py                          91                 detail=f"Invalid or expired Google OAuth credential: {str(verify_er…
+auth.py                          97             detail="Google token did not contain a valid email address."
+auth.py                         136             "target_role": "",
+auth.py                         162     auth_user = AuthUserResponse(
+auth.py                         168         target_role=user_doc.get("target_role", ""),
+auth.py                         177         role=user_doc.get("role", "learner"),
+auth.py                         181         f"Welcome to SkillBank, {auth_user.name}! Your account has been registered."
+auth.py                         183         else f"Welcome back, {auth_user.name}! Your dashboard profile has been load…
+auth.py                         187         user=auth_user,
+auth.py                         188         token=f"google_token_{clean_id}",
+auth.py                         193 async def google_auth(payload: GoogleLoginRequest):
+auth.py                         194     """Direct Google OAuth token verification and MongoDB user sync."""
+auth.py                         198 async def google_auth_alias(payload: GoogleLoginRequest):
+auth.py                         199     """Alias for /api/auth/google."""
+courses.py                        4 from backend.services.igot_service import igot_service
+courses.py                        6 router = APIRouter(prefix="/courses", tags=["iGOT Karmayogi Courses"])
+courses.py                        9 async def list_igot_courses(skill: Optional[str] = Query(None, description="Filter …
+courses.py                       10     """Returns the accredited mock iGOT Karmayogi course catalog, optionally filter…
+courses.py                       12         courses = await igot_service.find_courses_for_skills([skill])
+courses.py                       14         courses = await igot_service.get_all_courses()
+courses.py                       19     """Manually triggers seeding of default iGOT courses into the database."""
+courses.py                       20     count = await igot_service.seed_courses()
+courses.py                       21     return {"message": f"Successfully ensured {count} iGOT Karmayogi courses in dat…
+market.py                         9     role: str = Field(..., example="Full Stack Web Developer")
+market.py                        23 async def get_role_market_demand(
+market.py                        24     role: Optional[str] = Query(None, description="Role title to query market telem…
+market.py                        28     for the selected career role. Integrates Adzuna/Jooble aggregation logic.
+market.py                        30     target_role = role or "Full Stack Web Developer"
+market.py                        32         data = await market_service.get_market_demand(target_role)
+quiz.py                           6 from backend.services.gemini_service import gemini_service
+quiz.py                          15     and leverages Google Gemini API to formulate 5 Bloom's taxonomy MCQs in JSON fo…
+quiz.py                          43         # Invoke Gemini AI service
+quiz.py                          44         mcqs = await gemini_service.generate_mcqs_from_text(
+quiz.py                          53             source_model=settings.GEMINI_MODEL if gemini_service.api_key_configured…
+quiz.py                          78     using Gemini AI to power the interactive testing modal in the Skill Gap Matrix.
+quiz.py                          88         mcqs = await gemini_service.generate_mcqs_for_topic(clean_topic)
+quiz.py                          92             source_model=settings.GEMINI_MODEL if gemini_service.api_key_configured…
+skills.py                         4 from backend.models.skill import SkillAnalysisRequest, SkillAnalysisResponse, RoleB…
+skills.py                         7 from backend.services.gemini_service import gemini_service
+skills.py                        16     - Accepts user_id OR direct payload with target_role and current_skills.
+skills.py                        17     - Evaluates skills against MoSPI / industry role benchmark matrices.
+skills.py                        18     - Returns Competency Gap (missing skills) and recommended iGOT Karmayogi course…
+skills.py                        20     target_role = request.target_role
+skills.py                        29             if not target_role:
+skills.py                        30                 target_role = user_doc.get("target_role")
+skills.py                        36     if not target_role:
+skills.py                        37         target_role = "MoSPI Statistical Data Analyst"
+skills.py                        43         target_role=target_role,
+skills.py                        51     # so that on next login the full profile is restored (target_role, skills, scor…
+skills.py                        54             "target_role": response.target_role,
+skills.py                        76 @router.get("/roles", response_model=List[RoleBenchmark])
+skills.py                        77 async def get_role_benchmarks():
+skills.py                        78     """Returns the list of all supported target roles and their benchmark skill req…
+skills.py                        79     return skill_service.get_all_roles()
+skills.py                        91     and leverages Google Gemini AI to isolate technical competencies and tools.
+skills.py                       126         skills = await gemini_service.extract_skills_from_resume_text(extracted_tex…
+users.py                         14     Create or update a user's profile with their current degree, target job role, a…
+users.py                         21     # MoSPI Statistical Officer benchmark if no explicit target_role is given.
+users.py                         22     effective_target_role = profile_data.target_role or (
+users.py                         26         target_role_name=effective_target_role,
+__init__.py                       2 from backend.services.igot_service import igot_service
+__init__.py                       4 from backend.services.gemini_service import gemini_service
+__init__.py                       8     "igot_service",
+__init__.py                      10     "gemini_service"
+gemini_service.py                 9     logging.getLogger("skillbank.gemini").warning(f"Google Generative AI SDK could …
+gemini_service.py                14 logger = logging.getLogger("skillbank.gemini")
+gemini_service.py                16 # Fallback contextual question bank if GEMINI_API_KEY is not configured
+gemini_service.py                34         "question": "Under the MoSPI National Indicator Framework (NIF), what is th…
+gemini_service.py                36             "Eliminates sampling error without calculating standard deviations",
+gemini_service.py                43         "explanation": "Stratified Multi-Stage sampling ensures proportional covera…
+gemini_service.py                76         "question": "When securing RESTful microservice architectures for public se…
+gemini_service.py                78             "Unsigned Base64 authentication headers without time expiration",
+gemini_service.py                79             "Cryptographically signed JSON Web Tokens (JWT) verified using asymmetr…
+gemini_service.py                81             "Cleartext API access tokens passed inside URL query strings"
+gemini_service.py                84         "correct_answer": "Cryptographically signed JSON Web Tokens (JWT) verified …
+gemini_service.py                85         "explanation": "Asymmetric JWTs (RS256) permit distributed services to veri…
+gemini_service.py                90 class GeminiService:
+gemini_service.py                94         if genai and settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
+gemini_service.py                96                 self.client = genai.Client(api_key=settings.GEMINI_API_KEY.strip())
+gemini_service.py                98                 logger.info("Google Gemini API configured successfully.")
+gemini_service.py               100                 logger.warning(f"Failed to initialize Gemini SDK: {e}")
+gemini_service.py               104         Sends the extracted text to Google Gemini API with a prompt to generate 5 M…
+gemini_service.py               108             logger.info("GEMINI_API_KEY not provided in environment. Utilizing inte…
+gemini_service.py               149             logger.info(f"Dispatching prompt to Gemini model '{settings.GEMINI_MODE…
+gemini_service.py               150             response = self.client.models.generate_content(model=settings.GEMINI_MO…
+gemini_service.py               172             logger.info(f"Successfully generated {len(questions)} MCQs via Gemini A…
+gemini_service.py               176             logger.error(f"Gemini API request or JSON parsing error: {e}. Falling b…
+gemini_service.py               181         Parses resume text and extracts technical skills using Google Gemini AI.
+gemini_service.py               193             "Time Series Forecasting", "National Sampling (NSSO)", "Data Governance…
+gemini_service.py               198             logger.info("GEMINI_API_KEY not configured. Performing local heuristic …
+gemini_service.py               229             logger.info(f"Extracting skills from resume using Gemini model '{settin…
+gemini_service.py               230             response = self.client.models.generate_content(model=settings.GEMINI_MO…
+gemini_service.py               240                 logger.info(f"Gemini successfully extracted {len(skills_list)} skil…
+gemini_service.py               244             logger.error(f"Gemini resume skill extraction failed: {e}. Falling back…
+gemini_service.py               265             logger.info(f"GEMINI_API_KEY not configured. Formulating topic-tailored…
+gemini_service.py               289             logger.info(f"Requesting 5 MCQs for topic '{clean_topic}' from Gemini A…
+gemini_service.py               290             response = self.client.models.generate_content(model=settings.GEMINI_MO…
+gemini_service.py               313             logger.error(f"Gemini topic quiz generation error: {e}. Utilizing topic…
+gemini_service.py               423                     question="What security practice ensures secrets (e.g. database…
+gemini_service.py               426                         "Using centralized secret managers and masked environment v…
+gemini_service.py               428                         "Disabling authentication tokens on staging endpoints"
+gemini_service.py               431                     correct_answer="Using centralized secret managers and masked en…
+gemini_service.py               432                     explanation="Centralized secret management ensures tokens remai…
+gemini_service.py               579     async def generate_learning_roadmap(self, role_name: str, missing_skills: List[…
+gemini_service.py               584             logger.info("GEMINI_API_KEY not configured. Falling back to static road…
+gemini_service.py               595 A candidate is targeting the role '{role_name}'.
+gemini_service.py               616             logger.info(f"Generating personalized roadmap using Gemini model '{sett…
+gemini_service.py               617             response = self.client.models.generate_content(model=settings.GEMINI_MO…
+gemini_service.py               630             logger.error(f"Gemini roadmap generation failed: {e}. Falling back to s…
+gemini_service.py               652 gemini_service = GeminiService()
+igot_service.py                   5 # Curated mock iGOT Karmayogi course dataset aligned with MoSPI National Curricula
+igot_service.py                   6 DEFAULT_IGOT_COURSES: List[dict] = [
+igot_service.py                   8         "id": "IGOT-CS-101",
+igot_service.py                  12         "link": "https://igotkarmayogi.gov.in/course/IGOT-CS-101",
+igot_service.py                  13         "provider": "iGOT Karmayogi / MoSPI Digital Wing",
+igot_service.py                  20         "id": "IGOT-STAT-204",
+igot_service.py                  23         "description": "Official course on NSSO sampling methodology, Stratified Mu…
+igot_service.py                  24         "link": "https://igotkarmayogi.gov.in/course/IGOT-STAT-204",
+igot_service.py                  25         "provider": "National Statistical Systems Training Academy (NSSTA)",
+igot_service.py                  33         "id": "NSSTA-TPAC-011",
+igot_service.py                  35         "associated_skill": "Survey Design",
+igot_service.py                  36         "description": "Core induction programme recommended by NSSTA's Training Pr…
+igot_service.py                  37         "link": "https://igotkarmayogi.gov.in/course/NSSTA-TPAC-011",
+igot_service.py                  38         "provider": "National Statistical Systems Training Academy (NSSTA) - TPAC",
+igot_service.py                  41         "certification_badge": "NSSTA TPAC Certified",
+igot_service.py                  46         "id": "NSSTA-TPAC-022",
+igot_service.py                  50         "link": "https://igotkarmayogi.gov.in/course/NSSTA-TPAC-022",
+igot_service.py                  51         "provider": "National Statistical Systems Training Academy (NSSTA) - TPAC",
+igot_service.py                  54         "certification_badge": "NSSTA TPAC Certified",
+igot_service.py                  59         "id": "IGOT-OPS-302",
+igot_service.py                  63         "link": "https://igotkarmayogi.gov.in/course/IGOT-OPS-302",
+igot_service.py                  71         "id": "IGOT-DATA-108",
+igot_service.py                  75         "link": "https://igotkarmayogi.gov.in/course/IGOT-DATA-108",
+igot_service.py                  83         "id": "IGOT-CLOUD-401",
+igot_service.py                  87         "link": "https://igotkarmayogi.gov.in/course/IGOT-CLOUD-401",
+igot_service.py                  95         "id": "IGOT-SQL-202",
+igot_service.py                  99         "link": "https://igotkarmayogi.gov.in/course/IGOT-SQL-202",
+igot_service.py                 107         "id": "IGOT-AI-501",
+igot_service.py                 111         "link": "https://igotkarmayogi.gov.in/course/IGOT-AI-501",
+igot_service.py                 119         "id": "IGOT-SYS-303",
+igot_service.py                 123         "link": "https://igotkarmayogi.gov.in/course/IGOT-SYS-303",
+igot_service.py                 124         "provider": "IIT Delhi & iGOT Academic Portal",
+igot_service.py                 132 class IGOTService:
+igot_service.py                 138         """Seeds the mock iGOT courses into MongoDB or in-memory store if empty."""
+igot_service.py                 141             for course in DEFAULT_IGOT_COURSES:
+igot_service.py                 143             return len(DEFAULT_IGOT_COURSES)
+igot_service.py                 171 igot_service = IGOTService()
+market_service.py                14 ROLE_MARKET_DATABASE: Dict[str, Dict[str, Any]] = {
+market_service.py                29         "trending_skills": ["Python", "National Sampling (NSSO)", "Time Series Fore…
+market_service.py                39         "trending_skills": ["PyTorch / TensorFlow", "Vector Databases", "LangChain …
+market_service.py                63             logger.info("Adzuna/Jooble API in simulated mock mode (ready for live A…
+market_service.py                65     async def get_market_demand(self, role: str) -> Dict[str, Any]:
+market_service.py                67         Retrieves real-time or simulated market demand metrics for a given job role.
+market_service.py                71         clean_role = (role or "").strip()
+market_service.py                72         if not clean_role:
+market_service.py                73             clean_role = "Full Stack Web Developer"
+market_service.py                76         for benchmark_name, data in ROLE_MARKET_DATABASE.items():
+market_service.py                77             if benchmark_name.lower() in clean_role.lower() or clean_role.lower() i…
+market_service.py                79                     "role": benchmark_name,
+market_service.py                80                     "query": clean_role,
+market_service.py                93         # 2. Dynamic generation for arbitrary custom roles
+market_service.py                94         seed = sum(ord(c) for c in clean_role)
+market_service.py                98         keywords = clean_role.lower()
+market_service.py               106             trending = ["PyTorch", "LLMs", "Vector Search"]
+market_service.py               113             "role": clean_role,
+market_service.py               114             "query": clean_role,
+pdf_service.py                   38         # Truncate safely if document is very large to avoid hitting LLM context li…
+skill_service.py                  2 from backend.models.skill import SkillAnalysisRequest, SkillAnalysisResponse, RoleB…
+skill_service.py                  3 from backend.services.igot_service import igot_service
+skill_service.py                  4 from backend.services.gemini_service import gemini_service
+skill_service.py                  6 # Predefined standard role benchmark matrices aligned with MoSPI and National Class…
+skill_service.py                  7 # Each role now tags every required skill with one of the 4 PS-101 competency domai…
+skill_service.py                  9 ROLE_BENCHMARKS: Dict[str, dict] = {
+skill_service.py                 16             "Survey Design", "Sampling", "National Accounts", "Price Statistics",
+skill_service.py                 23             "Survey Design": "Statistical Competencies",
+skill_service.py                 24             "Sampling": "Statistical Competencies",
+skill_service.py                 25             "National Accounts": "Statistical Competencies",
+skill_service.py                 48             "Python", "R Programming", "Statistical Inference", "National Sampling …
+skill_service.py                 54             "National Sampling (NSSO)": "Statistical Competencies",
+skill_service.py                 93             "National Accounts Statistics"
+skill_service.py                 99             "National Accounts Statistics": "Statistical Competencies",
+skill_service.py                122             "Python", "PyTorch / TensorFlow", "Vector Databases", "LangChain / LLM …
+skill_service.py                133             "Linux Admin", "Docker", "Kubernetes", "AWS / NIC Meghraj Cloud",
+skill_service.py                155     "sampling": "National Sampling (NSSO)",
+skill_service.py                156     "nsso": "National Sampling (NSSO)",
+skill_service.py                158     "survey design": "Survey Design",
+skill_service.py                167     def get_all_roles(self) -> List[RoleBenchmark]:
+skill_service.py                168         return [RoleBenchmark(**data) for data in ROLE_BENCHMARKS.values()]
+skill_service.py                175         for role_data in ROLE_BENCHMARKS.values():
+skill_service.py                176             for req in role_data["required_skills"]:
+skill_service.py                181     def _match_role(self, target_role_name: str) -> dict:
+skill_service.py                183         for role_title, role_data in ROLE_BENCHMARKS.items():
+skill_service.py                184             if target_role_name.strip().lower() == role_title.strip().lower():
+skill_service.py                185                 return role_data
+skill_service.py                188         name_lower = target_role_name.strip().lower()
+skill_service.py                189         for role_title, role_data in ROLE_BENCHMARKS.items():
+skill_service.py                190             title_lower = role_title.strip().lower()
+skill_service.py                192                 return role_data
+skill_service.py                193         return ROLE_BENCHMARKS["MoSPI Statistical Data Analyst"]
+skill_service.py                196         self, target_role_name: str, current_skills: List[str], degree: str = ""
+skill_service.py                201         2. Retrieves benchmark required skills for the target role.
+skill_service.py                206         not semantic/LLM-based competency inference. Gemini is used elsewhere for
+skill_service.py                207         quiz generation. Wiring an LLM into this scoring step is a follow-up task,
+skill_service.py                210         matched_role = self._match_role(target_role_name)
+skill_service.py                212         required_skills = matched_role["required_skills"]
+skill_service.py                233     def build_domain_breakdown(self, target_role_name: str, acquired: List[str], mi…
+skill_service.py                235         matched_role = self._match_role(target_role_name)
+skill_service.py                236         skill_domains = matched_role.get("skill_domains", {})
+skill_service.py                259         role_name = request.target_role or "MoSPI Statistical Data Analyst"
+skill_service.py                264             target_role_name=role_name,
+skill_service.py                269         domain_breakdown = self.build_domain_breakdown(role_name, acquired, missing)
+skill_service.py                271         recommended_courses = await igot_service.find_courses_for_skills(missing)
+skill_service.py                276         milestones = await gemini_service.generate_learning_roadmap(
+skill_service.py                277             role_name=role_name,
+skill_service.py                283             target_role=role_name,
+App.jsx                           6 import { useAuth } from './context/AuthContext'
+App.jsx                          10 import AdminDashboard from './components/AdminDashboard'
+App.jsx                          19   targetRole: null,
+App.jsx                          29 const ProtectedRoute = ({ children, requireAnalysis = false, isAuthenticated, hasCo…
+App.jsx                          31     if (!isAuthenticated) {
+App.jsx                          33       setAuthModalOpen(true)
+App.jsx                          37   }, [isAuthenticated, requireAnalysis, hasCompletedAnalysis, showToast, setAuthMod…
+App.jsx                          39   if (!isAuthenticated) return <Navigate to="/" replace />
+App.jsx                          45   const { isAuthenticated, user } = useAuth()
+App.jsx                          48   const [authModalOpen, setAuthModalOpen] = useState(false)
+App.jsx                          52   // Restore hasCompletedAnalysis if the user already has a saved target_role
+App.jsx                          54     () => !!(user && user.target_role)
+App.jsx                          57   // Seed name/email/picture from real Google auth if available;
+App.jsx                          58   // Also restore analysis data if the returning user already has a saved target_ro…
+App.jsx                          66       if (user.target_role) {
+App.jsx                          67         base.targetRole = user.target_role;
+App.jsx                         113         setAuthModalOpen={setAuthModalOpen}
+App.jsx                         130             setAuthModalOpen={setAuthModalOpen}
+App.jsx                         131             isAuthenticated={isAuthenticated}
+App.jsx                         138           <ProtectedRoute requireAnalysis={true} isAuthenticated={isAuthenticated} …
+App.jsx                         143               setAuthModalOpen={setAuthModalOpen}
+App.jsx                         148           <ProtectedRoute isAuthenticated={isAuthenticated} hasCompletedAnalysis={h…
+App.jsx                         160           <ProtectedRoute isAuthenticated={isAuthenticated} hasCompletedAnalysis={h…
+App.jsx                         168         <Route path="/admin" element={
+App.jsx                         169           <ProtectedRoute isAuthenticated={isAuthenticated} hasCompletedAnalysis={h…
+App.jsx                         170             <AdminDashboard
+App.jsx                         180         isOpen={authModalOpen}
+App.jsx                         181         onClose={() => setAuthModalOpen(false)}
+App.jsx                         191             ...(loggedInUser.target_role ? {
+App.jsx                         192               targetRole: loggedInUser.target_role,
+App.jsx                         200           if (loggedInUser.target_role) {
+main.jsx                          4 import { AuthProvider } from './context/AuthContext.jsx'
+main.jsx                          5 import { GoogleOAuthProvider } from './context/GoogleOAuthContext.jsx'
+main.jsx                          9 // Removed mock user seeding to allow fresh visits to load LandingPage by default.
+main.jsx                         15     <AuthProvider>
+main.jsx                         16       <GoogleOAuthProvider clientId={clientId}>
+main.jsx                         20       </GoogleOAuthProvider>
+main.jsx                         21     </AuthProvider>
+AdminDashboard.jsx                3 import { useAuth } from '../context/AuthContext';
+AdminDashboard.jsx               10 const MOCK_FALLBACK = {
+AdminDashboard.jsx               11   _isMock: true,
+AdminDashboard.jsx               17     'State Directorates': 18, 'NSSTA': 12, 'Unassigned': 7,
+AdminDashboard.jsx               20     { skill: 'Statistical Sampling Methodology', officials_affected: 71 },
+AdminDashboard.jsx               85 export default function AdminDashboard({ showToast }) {
+AdminDashboard.jsx               87   const { token } = useAuth();
+AdminDashboard.jsx               90   const [isMock, setIsMock] = useState(false);
+AdminDashboard.jsx              100         if (token) headers['Authorization'] = `Bearer ${token}`;
+AdminDashboard.jsx              101         const res = await fetch(`${API_BASE_URL}/admin/overview`, { headers });
+AdminDashboard.jsx              112         if (mounted) { setData(json); setIsMock(false); }
+AdminDashboard.jsx              114         console.warn('AdminDashboard: backend unavailable, using sample data.', err…
+AdminDashboard.jsx              115         if (mounted) { setData(MOCK_FALLBACK); setIsMock(true); }
+AdminDashboard.jsx              121   }, [token]);
+AdminDashboard.jsx              141               Your account does not have <strong>Administrator</strong> privileges.
+AdminDashboard.jsx              142               Contact your MoSPI system administrator to request access.
+AdminDashboard.jsx              160                 <h1 className="text-2xl font-bold font-display text-slate-900">Admi…
+AdminDashboard.jsx              181           {/* MOCK BANNER */}
+AdminDashboard.jsx              182           {!loading && isMock && (
+AdminDashboard.jsx              188                   Could not reach <code className="font-mono bg-amber-100 px-1 roun…
+AdminDashboard.jsx              229                 <StatCard icon="gauge"      label="Avg. Readiness Score"    value={…
+AdminDashboard.jsx              230                 <StatCard icon="book-open"  label="Training Completion"     value={…
+Dashboard.jsx                     2 import { useAuth } from '../context/AuthContext';
+Dashboard.jsx                     5 import { IGOT_COURSES, ALL_RECOMMENDED_ROLES, JOB_ROLES_LIST } from '../utils/const…
+Dashboard.jsx                    11 export default function Dashboard({ userState, showToast, onOpenTopicQuiz, setAuthM…
+Dashboard.jsx                    13   const { isAuthenticated, user } = useAuth();
+Dashboard.jsx                    16   // --- DYNAMIC RADAR: axes derived from the user's actual target role skills ---
+Dashboard.jsx                    20     const targetRoleName = userState?.targetRole;
+Dashboard.jsx                    22     // Try to find the full requiredSkills list for this role from the registry
+Dashboard.jsx                    23     const allRoles = typeof JOB_ROLES_LIST !== 'undefined' ? JOB_ROLES_LIST : ALL_R…
+Dashboard.jsx                    24     const roleRecord = allRoles.find(
+Dashboard.jsx                    25       r => r.title === targetRoleName || r.title?.toLowerCase() === targetRoleName?…
+Dashboard.jsx                    27     const requiredSkills = roleRecord?.requiredSkills || [];
+Dashboard.jsx                    61   }, [userState?.knownSkills, userState?.missingSkills, userState?.targetRole]);
+Dashboard.jsx                    63   // If user is not authenticated AND no userState prop provided, show sign-in prom…
+Dashboard.jsx                    64   // If userState is provided (dev/mock mode via App.jsx MOCK_USER_STATE), render f…
+Dashboard.jsx                    73           <h2 className="text-2xl font-bold font-display text-slate-900 mb-2">Googl…
+Dashboard.jsx                    78             onClick={() => setAuthModalOpen ? setAuthModalOpen(true) : null}
+Dashboard.jsx                   158                   showToast("Loaded 4 recommended iGOT modules");
+Dashboard.jsx                   190               {user?.role === 'admin' && (
+Dashboard.jsx                   192                   onClick={() => navigate('/admin')}
+Dashboard.jsx                   197                     <span>Admin Panel</span>
+Dashboard.jsx                   208                 <span>iGOT Karmayogi Sync</span>
+Dashboard.jsx                   214                 onClick={() => showToast("Synced with iGOT Karmayogi API", "success…
+Dashboard.jsx                   241                 Active Target: <strong className="text-slate-800">{userState.target…
+Dashboard.jsx                   275               <p className="text-[11px] text-slate-500 mt-2">Target benchmark for M…
+Dashboard.jsx                   299               <p className="text-[11px] text-slate-500 mt-2">Actionable courses rea…
+Dashboard.jsx                   382                   {(userState?.missingSkills?.length > 0 ? userState.missingSkills …
+Dashboard.jsx                   399                           <p className="text-[11px] text-slate-600 mb-2">Identified…
+Dashboard.jsx                   538                     <span className="text-xs font-bold bg-amber-100 text-amber-800 …
+Dashboard.jsx                   540                   <p className="text-xs text-slate-500 mt-1">Courses matched to you…
+Dashboard.jsx                   548                 {IGOT_COURSES.map((course) => {
+Dashboard.jsx                   592                         Enroll on iGOT Karmayogi
+Dashboard.jsx                   640                       <span className="font-semibold text-slate-800 leading-snug">{…
+Dashboard.jsx                   691                         { label: 'iGOT Karmayogi Synced', status: false },
+Header.jsx                        2 import { useAuth } from '../context/AuthContext';
+Header.jsx                        6 export default function Header({ setAuthModalOpen, hasCompletedAnalysis, onSignOut …
+Header.jsx                        8   const { isAuthenticated, user, logout } = useAuth();
+Header.jsx                       24     logout();           // clears localStorage + AuthContext user/token
+Header.jsx                       64                 isAuthenticated
+Header.jsx                       68               title={!isAuthenticated ? 'Sign in to access Skill Analyzer' : ''}
+Header.jsx                       70               {!isAuthenticated && <Icon name="lock" size={12} className="text-slat…
+Header.jsx                       78                 isAuthenticated && hasCompletedAnalysis
+Header.jsx                       82               title={!isAuthenticated ? 'Sign in to access Dashboard' : !hasComplet…
+Header.jsx                       84               {(!isAuthenticated || !hasCompletedAnalysis) && <Icon name="lock" siz…
+Header.jsx                       92                 isAuthenticated
+Header.jsx                       96               title={!isAuthenticated ? 'Sign in to access AI Quiz' : ''}
+Header.jsx                       98               {!isAuthenticated && <Icon name="lock" size={12} className="text-slat…
+Header.jsx                      103           {/* AUTH SECTION */}
+Header.jsx                      105             {!isAuthenticated ? (
+Header.jsx                      107                 onClick={() => setAuthModalOpen(true)}
+LandingPage.jsx                   5 const QUICK_ROLES = [
+LandingPage.jsx                  12 export default function LandingPage({ showToast, userState, setUserState, isAuthent…
+LandingPage.jsx                  17   const requireAuth = (action) => {
+LandingPage.jsx                  18     if (!isAuthenticated) {
+LandingPage.jsx                  20       setAuthModalOpen(true);
+LandingPage.jsx                  26   const handleQuickSearch = (roleTitle) => {
+LandingPage.jsx                  27     requireAuth(() => {
+LandingPage.jsx                  28       setUserState(prev => ({ ...prev, targetRole: roleTitle }));
+LandingPage.jsx                  30       showToast(`Target role set to: ${roleTitle}`);
+LandingPage.jsx                  49             Empowering Indian graduates and professionals with real-time competency…
+LandingPage.jsx                  62                     if (!isAuthenticated) {
+LandingPage.jsx                  64                       setAuthModalOpen(true);
+LandingPage.jsx                  67                   placeholder={isAuthenticated ? "What is your current degree or ta…
+LandingPage.jsx                  69                   readOnly={!isAuthenticated}
+LandingPage.jsx                  73                 onClick={() => requireAuth(() => {
+LandingPage.jsx                  90             {QUICK_ROLES.map(role => (
+LandingPage.jsx                  92                 key={role.id}
+LandingPage.jsx                  93                 onClick={() => handleQuickSearch(role.title)}
+LandingPage.jsx                  96                 {role.title}
+LandingPage.jsx                 114             <div className="text-xs text-slate-500 font-medium mt-1">iGOT Karmayogi…
+LandingPage.jsx                 154                 onClick={() => requireAuth(() => navigate('/analyzer'))}
+LandingPage.jsx                 179                 onClick={() => requireAuth(() => navigate('/quiz'))}
+LandingPage.jsx                 188           {/* Feature 3: Official iGOT Karmayogi Integration */}
+LandingPage.jsx                 196                 3. Official iGOT Karmayogi Integration
+LandingPage.jsx                 199                 Directly transforms skill gaps into accredited learning journeys on…
+LandingPage.jsx                 204                 onClick={() => requireAuth(() => navigate('/analyzer'))}
+LandingPage.jsx                 207                 View iGOT Pathways <Icon name="chevron-right" size={14} />
+LandingPage.jsx                 248               <h4 className="font-bold text-slate-900 mb-2">Bridge via iGOT & AI Qu…
+LandingPage.jsx                 268               Get your free personalized Skill Gap Matrix and certified iGOT roadma…
+LandingPage.jsx                 272                 onClick={() => requireAuth(() => navigate('/analyzer'))}
+LandingPage.jsx                 279                 onClick={() => requireAuth(() => navigate('/dashboard'))}
+QuizPage.jsx                     62     description: "NSSO sampling methodologies, NIF indicators, stratified sampling,…
+QuizPage.jsx                    125     const roleBadge = userState.targetRole || "Target Skill";
+QuizPage.jsx                    147         description: `Test your knowledge and bridge your gap in ${skill} for the $…
+QuizPage.jsx                    152         badge: roleBadge,
+QuizPage.jsx                    182                 Powered by Gemini
+QuizPage.jsx                    192           <span className="text-xs font-bold text-amber-800">iGOT Karmayogi Aligned…
+QuizPage.jsx                    201           { label: "AI Engine", value: "Gemini", icon: "sparkles", color: "text-pur…
+QuizPage.jsx                    256             Type any skill, technology, or MoSPI domain — Gemini will generate tail…
+SignInModal.jsx                   2 import { useAuth } from '../context/AuthContext';
+SignInModal.jsx                   3 import { useGoogleOAuth } from '../context/GoogleOAuthContext';
+SignInModal.jsx                   7 // DYNAMIC GOOGLE AUTHENTICATION MODAL (SIGNINMODAL)
+SignInModal.jsx                  10   const { loginWithGoogle, loading, authError } = useAuth();
+SignInModal.jsx                  11   const { clientId } = useGoogleOAuth();
+SignInModal.jsx                  13   const [isAuthenticating, setIsAuthenticating] = useState(false);
+SignInModal.jsx                  27               setIsAuthenticating(true);
+SignInModal.jsx                  32                 showToast(`Authenticated as ${loggedInUser.name} (${loggedInUser.em…
+SignInModal.jsx                  37                 setLocalError(err.message || "Google token verification failed.");
+SignInModal.jsx                  39                 setIsAuthenticating(false);
+SignInModal.jsx                  89         {(localError || authError) && (
+SignInModal.jsx                  92             <span className="leading-snug">{localError || authError}</span>
+SignInModal.jsx                  96         {/* ONLY THE REAL GOOGLE AUTHENTICATION ACTION */}
+SignInModal.jsx                 103             Connect using your personal or university Google Account. Your assessme…
+SignInModal.jsx                 111             <span>Google OAuth 2.0 Verified</span>
+Step1DegreeSelection.jsx        531           <span>Continue to Target Role</span>
+TopicQuizModal.jsx              124               <p className="text-xs text-slate-500 mt-1">Formulating Bloom's taxono…
+TopicQuizModal.jsx              252                   : "Keep practicing! We recommend reviewing the aligned iGOT Karma…
+AuthContext.jsx                   5 // GLOBAL AUTHENTICATION CONTEXT (GOOGLE OAUTH & SESSION)
+AuthContext.jsx                   7 const AuthContext = createContext(null);
+AuthContext.jsx                   9 export function AuthProvider({ children }) {
+AuthContext.jsx                  19   const [token, setToken] = useState(() => localStorage.getItem("skillbank_token") …
+AuthContext.jsx                  21   const [authError, setAuthError] = useState(null);
+AuthContext.jsx                  23   // ── Helper: decode Google JWT payload locally (base64url → JSON) ──────────
+AuthContext.jsx                  24   const decodeGoogleJwt = (credential) => {
+AuthContext.jsx                  27       if (parts.length !== 3) throw new Error('Invalid JWT structure');
+AuthContext.jsx                  33       console.warn('[Auth] JWT local decode failed:', e);
+AuthContext.jsx                  38   // Verify and authenticate Google JWT token with FastAPI backend (/api/auth/googl…
+AuthContext.jsx                  39   // Falls back to local JWT decode if backend is unreachable (dev / offline mode)
+AuthContext.jsx                  41     console.log('[Auth] loginWithGoogle called, credential length:', credential?.le…
+AuthContext.jsx                  43     setAuthError(null);
+AuthContext.jsx                  45       console.log('[Auth] Calling backend:', `${API_BASE_URL}/auth/google`);
+AuthContext.jsx                  46       const res = await fetch(`${API_BASE_URL}/auth/google`, {
+AuthContext.jsx                  54         throw new Error(errData.detail || `Google authentication failed with HTTP $…
+AuthContext.jsx                  58       console.log('[Auth] Backend auth success, full user object:', data.user);
+AuthContext.jsx                  60       setToken(data.token);
+AuthContext.jsx                  62       localStorage.setItem("skillbank_token", data.token);
+AuthContext.jsx                  65       // ── FALLBACK: Backend unavailable — decode Google JWT locally ──────────
+AuthContext.jsx                  66       console.warn('[Auth] Backend unavailable, attempting local JWT fallback. Reas…
+AuthContext.jsx                  67       const decoded = decodeGoogleJwt(credential);
+AuthContext.jsx                  76         console.log('[Auth] Local fallback user:', fallbackUser.email, '| name:', f…
+AuthContext.jsx                  78         setToken('local-fallback-token');
+AuthContext.jsx                  80         localStorage.setItem("skillbank_token", 'local-fallback-token');
+AuthContext.jsx                  81         setAuthError(null); // clear any error — login succeeded via fallback
+AuthContext.jsx                  85       console.error('[Auth] Google OAuth error (no fallback possible):', err);
+AuthContext.jsx                  86       setAuthError(err.message || "Failed to sign in with Google. Make sure the bac…
+AuthContext.jsx                  95     setToken(null);
+AuthContext.jsx                  97     localStorage.removeItem("skillbank_token");
+AuthContext.jsx                 101     <AuthContext.Provider value={{
+AuthContext.jsx                 103       token,
+AuthContext.jsx                 104       isAuthenticated: !!user,
+AuthContext.jsx                 106       authError,
+AuthContext.jsx                 112     </AuthContext.Provider>
+AuthContext.jsx                 116 export function useAuth() {
+AuthContext.jsx                 117   const context = useContext(AuthContext);
+AuthContext.jsx                 118   if (!context) throw new Error("useAuth must be used within an AuthProvider");
+AuthContext.jsx                 122 export default AuthContext;
+GoogleOAuthContext.jsx            4 // GOOGLE OAUTH PROVIDER (SAFE CLIENT ID & GIS BINDING)
+GoogleOAuthContext.jsx            6 const GoogleOAuthContext = createContext({ clientId: "dummy-id-to-prevent-crash.app…
+GoogleOAuthContext.jsx            8 export function GoogleOAuthProvider({ clientId, children }) {
+GoogleOAuthContext.jsx           18     <GoogleOAuthContext.Provider value={{ clientId: safeClientId }}>
+GoogleOAuthContext.jsx           20     </GoogleOAuthContext.Provider>
+GoogleOAuthContext.jsx           24 export function useGoogleOAuth() {
+GoogleOAuthContext.jsx           25   return useContext(GoogleOAuthContext);
+GoogleOAuthContext.jsx           28 export default GoogleOAuthContext;
+Roadmap.jsx                       3 import { IGOT_COURSES } from '../../utils/constants';
+Roadmap.jsx                      14     description: "Survey design, sampling methodology, national accounts, and offic…
+Roadmap.jsx                      43       selectedRole,
+Roadmap.jsx                      92             keywords: ["sql", "pandas", "numpy", "data", "scikit-learn", "machine l…
+Roadmap.jsx                      93             description: "Survey design, sampling methodology, national accounts, a…
+Roadmap.jsx                     191           : (selectedRole?.requiredSkills || ["React", "Tailwind CSS", "Node.js", "…
+Roadmap.jsx                     199           const r = (selectedRole?.title || "").toLowerCase();
+Roadmap.jsx                     216             if (s.includes("sampling") || s.includes("model") || s.includes("tablea…
+Roadmap.jsx                     244             course: displayCourses[0] || IGOT_COURSES[0],
+Roadmap.jsx                     253             course: displayCourses[1] || IGOT_COURSES[1] || IGOT_COURSES[0],
+Roadmap.jsx                     262             course: displayCourses[2] || IGOT_COURSES[2] || IGOT_COURSES[0],
+Roadmap.jsx                     265       }, [identifiedGaps, selectedRole, displayCourses]);
+Roadmap.jsx                     268         if (score >= 75) return { label: "Role Ready • Final Polish", color: "text-…
+Roadmap.jsx                     275       // Safe Simulated Integration Handshake for iGOT Karmayogi Portal
+Roadmap.jsx                     279       const handleStartOnIgot = (phase, customKeyword) => {
+Roadmap.jsx                     289         setRedirectStage("Authenticating...");
+Roadmap.jsx                     290         showToast("Authenticating with MoSPI iGOT Portal...", "info");
+Roadmap.jsx                     300           window.open("https://igotkarmayogi.gov.in/", "_blank", "noopener,noreferr…
+Roadmap.jsx                     324                   {selectedRole.title}
+Roadmap.jsx                     541                   <p className="text-xs text-emerald-700 mt-1">You satisfy 100% of …
+Roadmap.jsx                     681                               onClick={() => handleStartOnIgot(phase, phase.stepNum…
+Roadmap.jsx                     688                                   <span>{redirectStage || "Connecting to iGOT..."}<…
+Roadmap.jsx                     692                                   <span>Start on iGOT</span>
+Roadmap.jsx                     700                               onClick={() => handleStartOnIgot(phase, "Backend Arch…
+Roadmap.jsx                     705                               <span>Start on iGOT</span>
+Roadmap.jsx                     711                               Free Government Accreditation &bull; iGOT Karmayogi
+SkillGapAnalyzer.jsx              4 import Step2RoleSelection from './Step2RoleSelection';
+SkillGapAnalyzer.jsx              6 import { ALL_RECOMMENDED_ROLES, TARGET_ROLES, IGOT_COURSES, MOSPI_OFFICIAL_ROLES } …
+SkillGapAnalyzer.jsx              7 import { useAuth } from '../../context/AuthContext';
+SkillGapAnalyzer.jsx             16       const { user } = useAuth();
+SkillGapAnalyzer.jsx             20         return userState?.targetRole ? 4 : 1;
+SkillGapAnalyzer.jsx             26         if (location.pathname.endsWith('/role')) return 2;
+SkillGapAnalyzer.jsx             36           const paths = ['/analyzer/degree', '/analyzer/role', '/analyzer/skills', …
+SkillGapAnalyzer.jsx             45         const paths = ['/analyzer/degree', '/analyzer/role', '/analyzer/skills', '/…
+SkillGapAnalyzer.jsx             49       const [selectedRole, setSelectedRole] = useState(TARGET_ROLES[0] || {});
+SkillGapAnalyzer.jsx             61       // When official mode is toggled on, default to first MoSPI role
+SkillGapAnalyzer.jsx             62       // When toggled off, revert to the first general role
+SkillGapAnalyzer.jsx             67             // Switching tracks — update selected role accordingly
+SkillGapAnalyzer.jsx             69               setSelectedRole(MOSPI_OFFICIAL_ROLES[0]);
+SkillGapAnalyzer.jsx             71               setSelectedRole(TARGET_ROLES[0] || {});
+SkillGapAnalyzer.jsx             83       const [roleDemandMap, setRoleDemandMap] = useState({});
+SkillGapAnalyzer.jsx             93         "R Programming", "Statistical Sampling", "Git", "RESTful APIs", "Time Serie…
+SkillGapAnalyzer.jsx            102             const promises = ALL_RECOMMENDED_ROLES.map(role => 
+SkillGapAnalyzer.jsx            103               fetch(`${API_BASE_URL}/market/demand?role=${encodeURIComponent(role.t…
+SkillGapAnalyzer.jsx            108                 .then(data => ({ id: role.id, data }))
+SkillGapAnalyzer.jsx            111                     id: role.id,
+SkillGapAnalyzer.jsx            113                       demand_score: role.demandScore,
+SkillGapAnalyzer.jsx            114                       demand_percentage: parseInt(role.demandScore) || 92,
+SkillGapAnalyzer.jsx            115                       trending_skills: role.requiredSkills.slice(0, 3)
+SkillGapAnalyzer.jsx            124               setRoleDemandMap(map);
+SkillGapAnalyzer.jsx            128             // Non-blocking: local role demand metrics are already active
+SkillGapAnalyzer.jsx            182         // Tier B: Resilient raw buffer text token scanner
+SkillGapAnalyzer.jsx            198       const extractSkillsFromText = (text, targetRole) => {
+SkillGapAnalyzer.jsx            207           "Time Series", "National Sampling (NSSO)", "Data Governance", "Data Clean…
+SkillGapAnalyzer.jsx            210           "Statistical Sampling", "Econometrics", "SPSS", "Excel", "Data Visualizat…
+SkillGapAnalyzer.jsx            225         // include the core competencies matching the student's selected target role
+SkillGapAnalyzer.jsx            226         if (matched.length < 3 && targetRole && targetRole.requiredSkills) {
+SkillGapAnalyzer.jsx            227           const defaults = targetRole.requiredSkills.slice(0, 4);
+SkillGapAnalyzer.jsx            281             extractedSkills = extractSkillsFromText(text, selectedRole);
+SkillGapAnalyzer.jsx            285             extractedSkills = extractSkillsFromText("", selectedRole);
+SkillGapAnalyzer.jsx            315             target_role: selectedRole.title,
+SkillGapAnalyzer.jsx            348             targetRole: data.target_role,
+SkillGapAnalyzer.jsx            370             const required = selectedRole?.requiredSkills || [];
+SkillGapAnalyzer.jsx            375               target_role: selectedRole.title,
+SkillGapAnalyzer.jsx            380               recommended_courses: IGOT_COURSES.slice(0, 3),
+SkillGapAnalyzer.jsx            394               targetRole: selectedRole.title,
+SkillGapAnalyzer.jsx            411       const roleRequirements = selectedRole?.requiredSkills || [];
+SkillGapAnalyzer.jsx            412       const verifiedKnown = backendAnalysis ? backendAnalysis.acquired_skills : kno…
+SkillGapAnalyzer.jsx            413       const identifiedGaps = backendAnalysis ? backendAnalysis.missing_skills : rol…
+SkillGapAnalyzer.jsx            414       const displayScore = backendAnalysis ? backendAnalysis.readiness_score : Math…
+SkillGapAnalyzer.jsx            417         : IGOT_COURSES;
+SkillGapAnalyzer.jsx            445                 { step: 2, label: "Target Role" },
+SkillGapAnalyzer.jsx            506               {/* STEP 2: SELECT TARGET ROLE (HYBRID SELECTION UI) */}
+SkillGapAnalyzer.jsx            508                 <Step2RoleSelection
+SkillGapAnalyzer.jsx            509                   selectedRole={selectedRole}
+SkillGapAnalyzer.jsx            511                   onSelectRole={setSelectedRole}
+SkillGapAnalyzer.jsx            512                   roleDemandMap={roleDemandMap}
+SkillGapAnalyzer.jsx            517                   officialQuickRoles={MOSPI_OFFICIAL_ROLES}
+SkillGapAnalyzer.jsx            529                   {/* RESUME / CV DRAG-AND-DROP UPLOAD COMPONENT (Gemini AI Extract…
+SkillGapAnalyzer.jsx            687                   selectedRole={selectedRole}
+Step2RoleSelection.jsx            3 import { getRecommendedRolesForDegree, JOB_ROLES_LIST } from '../../utils/constants…
+Step2RoleSelection.jsx            5 export default function Step2RoleSelection({
+Step2RoleSelection.jsx            6   selectedRole, selectedDegree, onSelectRole, roleDemandMap, loadingDemand,
+Step2RoleSelection.jsx            9   officialQuickRoles = [],
+Step2RoleSelection.jsx           17       // When in official track, override with the MoSPI role set passed in.
+Step2RoleSelection.jsx           18       const contextualQuickRoles = useMemo(() => {
+Step2RoleSelection.jsx           19         if (isOfficialProfile && officialQuickRoles.length > 0) {
+Step2RoleSelection.jsx           20           return officialQuickRoles;
+Step2RoleSelection.jsx           22         return getRecommendedRolesForDegree(selectedDegree);
+Step2RoleSelection.jsx           23       }, [selectedDegree, isOfficialProfile, officialQuickRoles]);
+Step2RoleSelection.jsx           76       // Filter roles based on search and sector filter
+Step2RoleSelection.jsx           77       const filteredRoles = useMemo(() => {
+Step2RoleSelection.jsx           79         const safeRoles = JOB_ROLES_LIST || [];
+Step2RoleSelection.jsx           80         if (!JOB_ROLES_LIST) console.error("CRITICAL ERROR: JOB_ROLES_LIST is undef…
+Step2RoleSelection.jsx           81         return safeRoles.filter(role => {
+Step2RoleSelection.jsx           82           const matchesSector = selectedSector === "All" || role.category.toLowerCa…
+Step2RoleSelection.jsx           85           return role.title.toLowerCase().includes(query) || 
+Step2RoleSelection.jsx           86                  role.category.toLowerCase().includes(query) ||
+Step2RoleSelection.jsx           87                  (role.requiredSkills && role.requiredSkills.some(skill => skill.to…
+Step2RoleSelection.jsx           95         const safeRoles = JOB_ROLES_LIST || [];
+Step2RoleSelection.jsx           96         return safeRoles.some(role => role.title.toLowerCase() === query);
+Step2RoleSelection.jsx           99       const handleSelectRole = (role) => {
+Step2RoleSelection.jsx          100         onSelectRole(role);
+Step2RoleSelection.jsx          104       // Create and select custom fallback role
+Step2RoleSelection.jsx          105       const handleSelectCustomRole = (customTitle) => {
+Step2RoleSelection.jsx          106         const customRole = {
+Step2RoleSelection.jsx          107           id: `custom_role_${Date.now()}`,
+Step2RoleSelection.jsx          122         onSelectRole(customRole);
+Step2RoleSelection.jsx          126       const isCustomRole = selectedRole && (selectedRole.isCustom || !(JOB_ROLES_LI…
+Step2RoleSelection.jsx          139               Step 2: Select Your Target Career Role
+Step2RoleSelection.jsx          151                 <span className="font-bold">Official MoSPI Track Active.</span> Sho…
+Step2RoleSelection.jsx          163                     ? "MoSPI Cadre Roles (Official Track)"
+Step2RoleSelection.jsx          165                       ? `Recommended Roles for ${selectedDegree.split('/')[0].split…
+Step2RoleSelection.jsx          166                       : "Top In-Demand Career Roles"
+Step2RoleSelection.jsx          180               {contextualQuickRoles.map((role) => {
+Step2RoleSelection.jsx          181                 const isSelected = selectedRole.id === role.id;
+Step2RoleSelection.jsx          182                 const dynamicDemand = roleDemandMap[role.id];
+Step2RoleSelection.jsx          185                     key={role.id}
+Step2RoleSelection.jsx          186                     onClick={() => handleSelectRole(role)}
+Step2RoleSelection.jsx          195                         <span className={`text-[10px] font-bold px-2.5 py-0.5 round…
+Step2RoleSelection.jsx          196                           {role.category}
+Step2RoleSelection.jsx          206                         {role.title}
+Step2RoleSelection.jsx          213                           <span>{dynamicDemand?.demand_score || role.demandScore ||…
+Step2RoleSelection.jsx          215                         {(dynamicDemand?.trending_skills || role.trending) && (
+Step2RoleSelection.jsx          218                             <span className="truncate">{role.trending || (dynamicDe…
+Step2RoleSelection.jsx          227                         {(role.requiredSkills || role.skills || []).slice(0, 4).map…
+Step2RoleSelection.jsx          232                         {(role.requiredSkills || role.skills || []).length > 4 && (
+Step2RoleSelection.jsx          234                             +{(role.requiredSkills || role.skills).length - 4} more
+Step2RoleSelection.jsx          249               or search all 500+ job roles & domains
+Step2RoleSelection.jsx          258                 Comprehensive Job Catalog / Custom Target Role
+Step2RoleSelection.jsx          262                   {filteredRoles.length} {filteredRoles.length === 1 ? 'match' : 'm…
+Step2RoleSelection.jsx          284                       const safeRoles = JOB_ROLES_LIST || [];
+Step2RoleSelection.jsx          285                       const exact = safeRoles.find(r => r.title.toLowerCase() === s…
+Step2RoleSelection.jsx          287                         handleSelectRole(exact);
+Step2RoleSelection.jsx          289                         handleSelectCustomRole(searchQuery.trim());
+Step2RoleSelection.jsx          296                 placeholder="Search from 500+ Job Roles or type your own..."
+Step2RoleSelection.jsx          358                     onClick={() => handleSelectCustomRole(searchQuery.trim())}
+Step2RoleSelection.jsx          375                           Add <span className="font-bold text-brand-900 underline d…
+Step2RoleSelection.jsx          386                 {/* Role List Container */}
+Step2RoleSelection.jsx          388                   {filteredRoles.length > 0 ? (
+Step2RoleSelection.jsx          389                     filteredRoles.map((role) => {
+Step2RoleSelection.jsx          390                       const isSelected = selectedRole.id === role.id;
+Step2RoleSelection.jsx          393                           key={role.id}
+Step2RoleSelection.jsx          394                           onClick={() => handleSelectRole(role)}
+Step2RoleSelection.jsx          408                               <span className="text-sm block font-medium truncate">…
+Step2RoleSelection.jsx          410                                 <span className="truncate">{role.requiredSkills.sli…
+Step2RoleSelection.jsx          416                             <span className={`text-[10px] font-bold px-2 py-0.5 rou…
+Step2RoleSelection.jsx          417                               {role.category}
+Step2RoleSelection.jsx          420                               {role.demandScore ? role.demandScore.split(" ")[0] : …
+Step2RoleSelection.jsx          434                       <p className="text-sm font-bold text-slate-800">No matching r…
+Step2RoleSelection.jsx          436                         Use the "Add as target role" option above to proceed with y…
+Step2RoleSelection.jsx          444                   <span>Showing {filteredRoles.length} benchmarked career roles</sp…
+Step2RoleSelection.jsx          462                   {isCustomRole ? (
+Step2RoleSelection.jsx          468                       {selectedRole.category}
+Step2RoleSelection.jsx          472                     {selectedRole.demandScore}
+Step2RoleSelection.jsx          476                   {selectedRole.title || "No career role selected"}
+Step2RoleSelection.jsx          481             {selectedRole && (
+Step2RoleSelection.jsx          484                 <span>{selectedRole.requiredSkills?.length || 6} Competencies Mappe…
+Step2RoleSelection.jsx          505               disabled={!selectedRole}
+Step2RoleSelection.jsx          508                 selectedRole
+

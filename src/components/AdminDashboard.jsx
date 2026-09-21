@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-
 import { apiFetch } from '../utils/apiFetch';
 const MOCK_FALLBACK = {
   _isMock: true,
@@ -79,8 +77,7 @@ function StatCard({ icon, label, value, sub, iconBg, iconColor, valueColor, barC
   );
 }
 
-export default function AdminDashboard({ showToast }) {
-  const navigate = useNavigate();
+export default function AdminDashboard({ setActivePage, showToast }) {
   const { token } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -138,7 +135,7 @@ export default function AdminDashboard({ showToast }) {
             </p>
           </div>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => setActivePage('dashboard')}
             className="px-5 py-2.5 bg-brand-900 hover:bg-brand-800 text-white font-bold text-sm rounded-xl shadow-sm flex items-center gap-2 transition-all"
           >
             <Icon name="arrow-left" size={15} /> Back to Dashboard
@@ -165,7 +162,7 @@ export default function AdminDashboard({ showToast }) {
                 <Icon name="refresh-cw" size={14} /><span>Refresh</span>
               </button>
               <button
-                onClick={() => navigate('/dashboard')}
+                onClick={() => setActivePage('dashboard')}
                 className="px-4 py-2 bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all"
               >
                 <Icon name="arrow-left" size={14} /><span>Dashboard</span>

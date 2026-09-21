@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import Icon from './Icon';
+import { TARGET_ROLES, MOSPI_OFFICIAL_ROLES, JOB_ROLES_LIST } from '../utils/constants';
+import { DEGREES_LIST } from '../data/degrees';
 
 const QUICK_ROLES = [
   { id: "fullstack", title: "Full Stack Web Developer" },
@@ -10,6 +12,85 @@ const QUICK_ROLES = [
 
 export default function LandingPage({ setActivePage, showToast, userState, setUserState, isAuthenticated, setAuthModalOpen }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredResults = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return [];
+    
+    const degrees = (DEGREES_LIST || []).filter(deg => 
+      (deg.name && deg.name.toLowerCase().includes(query)) ||
+      (deg.code && deg.code.toLowerCase().includes(query)) ||
+      (deg.stream && deg.stream.toLowerCase().includes(query))
+    ).map(deg => ({ type: 'degree', label: deg.name, subtitle: deg.stream, item: deg }));
+
+    const roles = (JOB_ROLES_LIST || []).filter(role => 
+      (role.title && role.title.toLowerCase().includes(query)) ||
+      (role.category && role.category.toLowerCase().includes(query)) ||
+      (role.requiredSkills && role.requiredSkills.some(s => s.toLowerCase().includes(query)))
+    ).map(role => ({ type: 'role', label: role.title, subtitle: role.category, item: role }));
+
+    const mospiRoles = (MOSPI_OFFICIAL_ROLES || []).filter(role => 
+      (role.title && role.title.toLowerCase().includes(query)) ||
+      (role.category && role.category.toLowerCase().includes(query)) ||
+      (role.requiredSkills && role.requiredSkills.some(s => s.toLowerCase().includes(query)))
+    ).map(role => ({ type: 'mospi_role', label: role.title, subtitle: role.category, item: role }));
+
+    return [...degrees, ...roles, ...mospiRoles];
+  }, [searchQuery]);
+
+  const hasExactMatch = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return [...(DEGREES_LIST || []).map(d => d.name), ...(JOB_ROLES_LIST || []).map(r => r.title), ...(MOSPI_OFFICIAL_ROLES || []).map(r => r.title)]
+      .some(t => t && t.toLowerCase() === query);
+  }, [searchQuery]);
+
+  const handleSelect = (result) => {
+    requireAuth(() => {
+      if (result.type === 'degree') {
+        setUserState(prev => ({ ...prev, degree: result.label, isOfficial: false, forceStep: null }));
+        showToast(`Degree set to: ${result.label}`);
+      } else if (result.type === 'role') {
+        setUserState(prev => ({ 
+          ...prev, 
+          targetRole: result.label,
+          readinessScore: undefined,
+          missingSkills: [],
+          isOfficial: false,
+          forceStep: 2
+        }));
+        showToast(`Target role set to: ${result.label}`);
+      } else if (result.type === 'mospi_role') {
+        setUserState(prev => ({ 
+          ...prev, 
+          targetRole: result.label,
+          readinessScore: undefined,
+          missingSkills: [],
+          isOfficial: true,
+          forceStep: 2
+        }));
+        showToast(`Govt Role set to: ${result.label}`);
+      } else if (result.type === 'custom') {
+        setUserState(prev => ({ ...prev, degree: result.label, isOfficial: false, forceStep: null }));
+        showToast(`Custom entry set to: ${result.label}`);
+      }
+      setSearchQuery(result.label);
+      setIsDropdownOpen(false);
+      setActivePage('analyzer');
+    });
+  };
 
   // Guard helper: require login before navigating to protected pages
   const requireAuth = (action) => {
@@ -23,7 +104,12 @@ export default function LandingPage({ setActivePage, showToast, userState, setUs
 
   const handleQuickSearch = (roleTitle) => {
     requireAuth(() => {
-      setUserState(prev => ({ ...prev, targetRole: roleTitle }));
+      setUserState(prev => ({ 
+        ...prev, 
+        targetRole: roleTitle,
+        readinessScore: undefined,
+        missingSkills: []
+      }));
       setActivePage('analyzer');
       showToast(`Target role set to: ${roleTitle}`);
     });
@@ -48,19 +134,27 @@ export default function LandingPage({ setActivePage, showToast, userState, setUs
           </p>
 
           {/* Dynamic Search & Input Box */}
-          <div className="max-w-2xl mx-auto bg-white p-2 sm:p-2.5 rounded-2xl shadow-xl shadow-blue-900/10 border border-slate-200/90 mb-6 transition-all hover:border-blue-400">
+          <div className="max-w-2xl mx-auto bg-white p-2 sm:p-2.5 rounded-2xl shadow-xl shadow-blue-900/10 border border-slate-200/90 mb-6 transition-all hover:border-blue-400 relative" ref={dropdownRef}>
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <div className="flex items-center gap-2.5 px-3 py-2 flex-1 w-full">
                 <Icon name="search" size={20} className="text-slate-400" />
                 <input 
                   type="text" 
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (isAuthenticated) setIsDropdownOpen(true);
+                  }}
                   onFocus={() => {
                     if (!isAuthenticated) {
                       showToast('🔒 Please sign in first to use the analyzer.');
                       setAuthModalOpen(true);
+                    } else {
+                      setIsDropdownOpen(true);
                     }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setIsDropdownOpen(false);
                   }}
                   placeholder={isAuthenticated ? "What is your current degree or target role? (e.g. B.Tech, Data Analyst)" : "Sign in to start your skill analysis..."}
                   className="w-full text-sm sm:text-base text-slate-800 placeholder-slate-400 focus:outline-none"
@@ -80,6 +174,75 @@ export default function LandingPage({ setActivePage, showToast, userState, setUs
                 <Icon name="sparkles" size={16} className="text-amber-400" />
               </button>
             </div>
+
+            {isDropdownOpen && searchQuery.trim().length > 0 && (
+              <div className="absolute z-50 left-0 right-0 mt-4 bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 text-left">
+                {/* Custom Entry Fallback */}
+                {!hasExactMatch && (
+                  <div
+                    onClick={() => handleSelect({ type: 'custom', label: searchQuery.trim() })}
+                    className="p-3.5 px-4 bg-gradient-to-r from-amber-500/10 via-brand-50/50 to-white hover:from-amber-500/20 hover:to-blue-50/90 border-b border-slate-100 cursor-pointer flex items-center justify-between transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
+                        <Icon name="plus" size={16} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">Custom Entry</span>
+                        </div>
+                        <p className="text-sm font-semibold text-slate-900 mt-0.5">
+                          Continue with <span className="font-bold text-brand-900 underline decoration-amber-500">"{searchQuery.trim()}"</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+                  {filteredResults.length > 0 ? (
+                    filteredResults.map((result, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleSelect(result)}
+                        className="p-3 px-4 cursor-pointer transition-all flex items-center justify-between hover:bg-slate-50/90 text-slate-800"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                            result.type === 'degree' ? 'bg-blue-100 text-blue-600' : 
+                            result.type === 'mospi_role' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-600'
+                          }`}>
+                            <Icon name={result.type === 'degree' ? 'graduation-cap' : result.type === 'mospi_role' ? 'shield-check' : 'briefcase'} size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-sm font-medium truncate block">{result.label}</span>
+                            <span className="text-[10px] text-slate-400 block">{result.subtitle}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            result.type === 'degree' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                            result.type === 'mospi_role' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          }`}>
+                            {result.type === 'degree' ? 'Degree' : result.type === 'mospi_role' ? 'Govt Role' : 'Industry Role'}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-8 text-center">
+                      <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                        <Icon name="search" size={24} />
+                      </div>
+                      <p className="text-sm font-bold text-slate-800">No matches found &mdash; you can still continue</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Use the "Custom Entry" option above to proceed with your exact degree or role.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Quick Suggestion Pills */}

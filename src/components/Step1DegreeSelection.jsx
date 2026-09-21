@@ -21,6 +21,15 @@ export default function Step1DegreeSelection({
   const [selectedStream, setSelectedStream] = useState('All');
   const dropdownRef = useRef(null);
 
+  // Sync search input with selected degree
+  useEffect(() => {
+    if (selectedDegree) {
+      setSearchQuery(selectedDegree);
+    } else {
+      setSearchQuery('');
+    }
+  }, [selectedDegree]);
+
   // ── Close dropdown on outside click ────────────────────────────
   useEffect(() => {
     function handleClickOutside(event) {
@@ -59,22 +68,23 @@ export default function Step1DegreeSelection({
   const filteredDegrees = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return DEGREES_LIST.filter(deg => {
-      const matchesStream = selectedStream === 'All' || deg.stream.toLowerCase() === selectedStream.toLowerCase();
+      const matchesStream = selectedStream === 'All' || (deg.stream && deg.stream.toLowerCase() === selectedStream.toLowerCase());
       if (!matchesStream) return false;
       if (!query) return true;
-      return deg.name.toLowerCase().includes(query) ||
-             deg.code.toLowerCase().includes(query) ||
-             deg.stream.toLowerCase().includes(query);
+      return (deg.name && deg.name.toLowerCase().includes(query)) ||
+             (deg.code && deg.code.toLowerCase().includes(query)) ||
+             (deg.stream && deg.stream.toLowerCase().includes(query));
     });
   }, [searchQuery, selectedStream]);
 
   const hasExactMatch = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return true;
-    return DEGREES_LIST.some(deg => deg.name.toLowerCase() === query);
+    return DEGREES_LIST.some(deg => deg.name && deg.name.toLowerCase() === query);
   }, [searchQuery]);
 
   const handleSelect = (degreeName) => {
+    setSearchQuery(degreeName);
     onSelectDegree(degreeName);
     setIsDropdownOpen(false);
   };
@@ -458,9 +468,9 @@ export default function Step1DegreeSelection({
                   <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
                     <Icon name="graduation-cap" size={24} />
                   </div>
-                  <p className="text-sm font-bold text-slate-800">No matching degree in database</p>
+                  <p className="text-sm font-bold text-slate-800">No matches found &mdash; you can still type a custom degree</p>
                   <p className="text-xs text-slate-500 mt-1">
-                    Use the "Add as custom degree" option above to proceed with your exact degree.
+                    Use the "Custom Degree Entry" option above to proceed with your exact degree.
                   </p>
                 </div>
               )}

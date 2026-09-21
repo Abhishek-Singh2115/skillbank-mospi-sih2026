@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import Icon from './Icon';
 import SkillRadarChart from './SkillRadarChart';
 import { IGOT_COURSES, ALL_RECOMMENDED_ROLES, JOB_ROLES_LIST } from '../utils/constants';
+import { apiFetch } from '../utils/apiFetch';
 
 // ==========================================
 // NATIONAL SKILLING COMMAND CENTER — DASHBOARD
@@ -57,6 +58,15 @@ export default function Dashboard({ setActivePage, userState, showToast, onOpenT
       benchmarkScores: benchmarks,
     };
   }, [userState?.knownSkills, userState?.missingSkills, userState?.targetRole]);
+
+  const recommendedCourses = useMemo(() => {
+    const missingSkillsLower = (userState?.missingSkills || []).map(s => s.toLowerCase());
+    return IGOT_COURSES.filter(course => 
+      course.skillsCovered.some(skill => 
+        missingSkillsLower.some(missing => missing.includes(skill.toLowerCase()) || skill.toLowerCase().includes(missing))
+      )
+    );
+  }, [userState?.missingSkills]);
 
   // If user is not authenticated AND no userState prop provided, show sign-in prompt.
   // If userState is provided (dev/mock mode via App.jsx MOCK_USER_STATE), render fully.
@@ -153,7 +163,11 @@ export default function Dashboard({ setActivePage, userState, showToast, onOpenT
               <button
                 onClick={() => {
                   setSidebarTab('courses');
-                  showToast("Loaded 4 recommended iGOT modules");
+                  if (recommendedCourses.length > 0) {
+                    showToast(`Loaded ${recommendedCourses.length} recommended iGOT modules`);
+                  } else {
+                    showToast("No relevant iGOT modules found for your skill gaps");
+                  }
                 }}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                   sidebarTab === 'courses' 
@@ -165,7 +179,11 @@ export default function Dashboard({ setActivePage, userState, showToast, onOpenT
                   <Icon name="book-open" size={16} />
                   <span>Recommended Courses</span>
                 </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">4</span>
+                {recommendedCourses.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">
+                    {recommendedCourses.length}
+                  </span>
+                )}
               </button>
 
               <button
@@ -536,57 +554,77 @@ export default function Dashboard({ setActivePage, userState, showToast, onOpenT
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {IGOT_COURSES.map((course) => {
-                  const levelColors = {
-                    'Beginner-Intermediate': 'bg-blue-50 text-blue-700 border-blue-200',
-                    'Intermediate': 'bg-amber-50 text-amber-700 border-amber-200',
-                    'Advanced': 'bg-red-50 text-red-700 border-red-200',
-                  };
-                  const badgeColors = {
-                    'Govt Certified': 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                    'Official MoSPI': 'bg-brand-900/10 text-brand-900 border-brand-900/20',
-                  };
-                  return (
-                    <div key={course.id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all flex flex-col gap-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <h3 className="font-bold text-sm text-slate-900 leading-snug">{course.title}</h3>
-                          <p className="text-[11px] text-slate-500 mt-1">{course.provider}</p>
+              {recommendedCourses.length === 0 ? (
+                <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-slate-200 border-dashed">
+                  <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Icon name="book" size={24} />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-700">No matching iGOT courses found</h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                    We currently don't have mock courses in the catalog that specifically match your identified skill gaps.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {recommendedCourses.map((course) => {
+                    const levelColors = {
+                      'Beginner-Intermediate': 'bg-blue-50 text-blue-700 border-blue-200',
+                      'Intermediate': 'bg-amber-50 text-amber-700 border-amber-200',
+                      'Advanced': 'bg-red-50 text-red-700 border-red-200',
+                    };
+                    const badgeColors = {
+                      'Govt Certified': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                      'Official MoSPI': 'bg-brand-900/10 text-brand-900 border-brand-900/20',
+                    };
+                    return (
+                      <div key={course.id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all flex flex-col gap-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <h3 className="font-bold text-sm text-slate-900 leading-snug">{course.title}</h3>
+                            <p className="text-[11px] text-slate-500 mt-1">{course.provider}</p>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0 ${badgeColors[course.badge] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                            {course.badge}
+                          </span>
                         </div>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0 ${badgeColors[course.badge] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
-                          {course.badge}
-                        </span>
-                      </div>
 
-                      <div className="flex flex-wrap gap-1.5">
-                        {course.skillsCovered.map((skill, i) => (
-                          <span key={i} className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">{skill}</span>
-                        ))}
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-3">
-                        <div className="flex items-center gap-3">
-                          <span className="flex items-center gap-1"><Icon name="clock" size={12} /> {course.duration}</span>
-                          <span className="flex items-center gap-1"><Icon name="layers" size={12} /> {course.modules} modules</span>
-                          <span className="flex items-center gap-1"><Icon name="users" size={12} /> {course.enrolledCount} enrolled</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {course.skillsCovered.map((skill, i) => (
+                            <span key={i} className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">{skill}</span>
+                          ))}
                         </div>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${levelColors[course.level] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
-                          {course.level}
-                        </span>
-                      </div>
 
-                      <button
-                        onClick={() => showToast(`Enrolled in: ${course.title}`)}
-                        className="w-full py-2.5 bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 active:scale-95"
-                      >
-                        <Icon name="play" size={13} />
-                        Enroll on iGOT Karmayogi
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-3">
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1"><Icon name="clock" size={12} /> {course.duration}</span>
+                            <span className="flex items-center gap-1"><Icon name="layers" size={12} /> {course.modules} modules</span>
+                            <span className="flex items-center gap-1"><Icon name="users" size={12} /> {course.enrolledCount} enrolled</span>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${levelColors[course.level] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                            {course.level}
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await apiFetch(`/courses/${course.id}/enroll`, { method: 'POST' });
+                              if (!res.ok) throw new Error('Enroll failed');
+                              showToast(`Enrolled in: ${course.title}`);
+                            } catch(e) {
+                              showToast(`Failed to enroll in: ${course.title}`);
+                            }
+                          }}
+                          className="w-full py-2.5 bg-brand-900 hover:bg-brand-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                        >
+                          <Icon name="play" size={13} />
+                          Enroll on iGOT Karmayogi
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 

@@ -13,6 +13,15 @@ export default function Step2RoleSelection({
       const [selectedSector, setSelectedSector] = useState("All");
       const dropdownRef = useRef(null);
 
+      // Sync search input with selected role
+      useEffect(() => {
+        if (selectedRole) {
+          setSearchQuery(selectedRole.title);
+        } else {
+          setSearchQuery("");
+        }
+      }, [selectedRole]);
+
       // Contextually compute the 4 quick select cards based on selectedDegree
       // When in official track, override with the MoSPI role set passed in.
       const contextualQuickRoles = useMemo(() => {
@@ -79,11 +88,11 @@ export default function Step2RoleSelection({
         const safeRoles = JOB_ROLES_LIST || [];
         if (!JOB_ROLES_LIST) console.error("CRITICAL ERROR: JOB_ROLES_LIST is undefined!");
         return safeRoles.filter(role => {
-          const matchesSector = selectedSector === "All" || role.category.toLowerCase() === selectedSector.toLowerCase();
+          const matchesSector = selectedSector === "All" || (role.category && role.category.toLowerCase() === selectedSector.toLowerCase());
           if (!matchesSector) return false;
           if (!query) return true;
-          return role.title.toLowerCase().includes(query) || 
-                 role.category.toLowerCase().includes(query) ||
+          return (role.title && role.title.toLowerCase().includes(query)) || 
+                 (role.category && role.category.toLowerCase().includes(query)) ||
                  (role.requiredSkills && role.requiredSkills.some(skill => skill.toLowerCase().includes(query)));
         });
       }, [searchQuery, selectedSector]);
@@ -97,6 +106,7 @@ export default function Step2RoleSelection({
       }, [searchQuery]);
 
       const handleSelectRole = (role) => {
+        setSearchQuery(role.title);
         onSelectRole(role);
         setIsDropdownOpen(false);
       };
@@ -119,6 +129,7 @@ export default function Step2RoleSelection({
             "Quality Assurance & Compliance"
           ]
         };
+        setSearchQuery(customTitle.trim());
         onSelectRole(customRole);
         setIsDropdownOpen(false);
       };
@@ -431,9 +442,9 @@ export default function Step2RoleSelection({
                       <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
                         <Icon name="briefcase" size={24} />
                       </div>
-                      <p className="text-sm font-bold text-slate-800">No matching role in database</p>
+                      <p className="text-sm font-bold text-slate-800">No matches found &mdash; you can still type a custom role</p>
                       <p className="text-xs text-slate-500 mt-1">
-                        Use the "Add as target role" option above to proceed with your exact career path.
+                        Use the "Custom Career Pathway" option above to proceed with your exact career path.
                       </p>
                     </div>
                   )}

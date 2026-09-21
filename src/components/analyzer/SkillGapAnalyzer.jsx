@@ -5,6 +5,7 @@ import Step2RoleSelection from './Step2RoleSelection';
 import Roadmap from './Roadmap';
 import { ALL_RECOMMENDED_ROLES, TARGET_ROLES, IGOT_COURSES, MOSPI_OFFICIAL_ROLES } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
+import { apiFetch } from '../../utils/apiFetch';
 
 const API_BASE_URL = (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1')
       ? 'http://127.0.0.1:8000/api'
@@ -12,18 +13,28 @@ const API_BASE_URL = (typeof window !== 'undefined' && window.location.hostname 
 
 export default function SkillGapAnalyzer({ setActivePage, userState, setUserState, showToast, onOpenTopicQuiz, onAnalysisComplete, setGlobalApiError }) {
       const { user } = useAuth();
-      const [currentStep, setCurrentStep] = useState(1);
+      const [currentStep, setCurrentStep] = useState(() => {
+        if (userState?.forceStep) return userState.forceStep;
+        return (userState?.targetRole && userState?.readinessScore !== undefined) ? 4 : 1;
+      });
       const [selectedDegree, setSelectedDegree] = useState(userState?.degree || "");
-      const [selectedRole, setSelectedRole] = useState(TARGET_ROLES[0] || {});
+      const [selectedRole, setSelectedRole] = useState(() => {
+        if (userState?.targetRole) {
+          const allRoles = [...(typeof ALL_RECOMMENDED_ROLES !== 'undefined' ? ALL_RECOMMENDED_ROLES : []), ...TARGET_ROLES, ...MOSPI_OFFICIAL_ROLES];
+          const found = allRoles.find(r => r.title === userState.targetRole);
+          if (found) return found;
+        }
+        return TARGET_ROLES[0] || {};
+      });
       const [knownSkillsList, setKnownSkillsList] = useState(userState?.knownSkills || []);
       const [customSkillInput, setCustomSkillInput] = useState("");
 
       // Official government profile state (MoSPI / OSS track)
       const [officialProfile, setOfficialProfile] = useState({
-        isOfficial: false,
-        designation: '',
-        department: '',
-        workExperienceYears: '',
+        isOfficial: userState?.isOfficial || false,
+        designation: user?.designation || '',
+        department: user?.department || '',
+        workExperienceYears: user?.work_experience_years || '',
       });
 
       // When official mode is toggled on, default to first MoSPI role
@@ -68,7 +79,7 @@ export default function SkillGapAnalyzer({ setActivePage, userState, setUserStat
           setLoadingDemand(true);
           try {
             const promises = ALL_RECOMMENDED_ROLES.map(role => 
-              fetch(`${API_BASE_URL}/market/demand?role=${encodeURIComponent(role.title)}`)
+              apiFetch(`/market/demand?role=${encodeURIComponent(role.title)}`)
                 .then(res => {
                   if (!res.ok) throw new Error(`HTTP ${res.status}`);
                   return res.json();
@@ -226,7 +237,7 @@ export default function SkillGapAnalyzer({ setActivePage, userState, setUserStat
         try {
           const formData = new FormData();
           formData.append("file", file);
-          const res = await fetch(`${API_BASE_URL}/skills/extract-resume`, {
+          const res = await apiFetch(`/skills/extract-resume`, {
             method: "POST",
             body: formData
           });
@@ -293,7 +304,7 @@ export default function SkillGapAnalyzer({ setActivePage, userState, setUserStat
                 : undefined,
             } : {}),
           };
-          const response = await fetch(`${API_BASE_URL}/skills/analyze`, {
+          const response = await apiFetch(`/skills/analyze`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
