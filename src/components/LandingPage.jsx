@@ -168,7 +168,7 @@ export default function LandingPage({ showToast, userState, setUserState, isAuth
                   if (searchQuery.trim()) {
                     setUserState(prev => ({ ...prev, degree: searchQuery }));
                   }
-                  undefined;
+                  navigate('/analyzer');
                 })}
                 className="w-full sm:w-auto px-6 py-3 rounded-xl bg-brand-900 hover:bg-brand-800 text-white font-bold text-sm shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
               >
@@ -314,7 +314,7 @@ export default function LandingPage({ showToast, userState, setUserState, isAuth
             </div>
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-brand-900 group-hover:text-blue-600">
               <span
-                onClick={() => requireAuth(() => undefined)}
+                onClick={() => requireAuth(() => navigate('/analyzer'))}
                 className="cursor-pointer flex items-center gap-1"
               >
                 Try Competency Mapper <Icon name="chevron-right" size={14} />
@@ -339,7 +339,7 @@ export default function LandingPage({ showToast, userState, setUserState, isAuth
             </div>
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-600 group-hover:text-amber-700">
               <span
-                onClick={() => requireAuth(() => undefined)}
+                onClick={() => requireAuth(() => navigate('/analyzer'))}
                 className="cursor-pointer flex items-center gap-1"
               >
                 Launch Quiz Generator <Icon name="chevron-right" size={14} />
@@ -364,7 +364,7 @@ export default function LandingPage({ showToast, userState, setUserState, isAuth
             </div>
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-600 group-hover:text-emerald-700">
               <span
-                onClick={() => requireAuth(() => undefined)}
+                onClick={() => requireAuth(() => navigate('/analyzer'))}
                 className="cursor-pointer flex items-center gap-1"
               >
                 View iGOT Pathways <Icon name="chevron-right" size={14} />
@@ -432,14 +432,14 @@ export default function LandingPage({ showToast, userState, setUserState, isAuth
             </p>
             <div className="flex flex-wrap gap-4">
               <button
-                onClick={() => requireAuth(() => undefined)}
+                onClick={() => requireAuth(() => navigate('/analyzer'))}
                 className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm shadow-lg transition-all active:scale-95 flex items-center gap-2"
               >
                 <span>Start Gap Analysis Now</span>
                 <Icon name="arrow-right" size={16} />
               </button>
               <button
-                onClick={() => requireAuth(() => undefined)}
+                onClick={() => requireAuth(() => navigate('/dashboard'))}
                 className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl text-sm backdrop-blur-sm transition-all flex items-center gap-2 border border-white/20"
               >
                 <span>Explore Sample Dashboard</span>

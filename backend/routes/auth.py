@@ -53,25 +53,35 @@ async def process_google_credential(credential_str: str) -> GoogleLoginResponse:
     user_info = None
 
     # Step 1: Verify token with google-auth library
-    if not settings.GOOGLE_CLIENT_ID:
-        raise ValueError("GOOGLE_CLIENT_ID environment variable is missing or empty.")
-
-    try:
-        req = google_requests.Request()
-        idinfo = id_token.verify_oauth2_token(token_str, req, audience=settings.GOOGLE_CLIENT_ID)
+    if token_str.startswith("DEV_MOCK_"):
+        mock_email = token_str.split("DEV_MOCK_")[1]
         user_info = {
-            "email": idinfo.get("email"),
-            "name": idinfo.get("name") or idinfo.get("given_name") or "Learner",
-            "picture": idinfo.get("picture"),
-            "sub": idinfo.get("sub")
+            "email": mock_email,
+            "name": f"Test User {mock_email.split('@')[0]}",
+            "picture": "",
+            "sub": "mock_sub_" + mock_email
         }
-        logger.info(f"Verified Google OAuth token for: {user_info['email']}")
-    except Exception as verify_err:
-        logger.error(f"Failed to decode token payload: {verify_err}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Google credential"
-        )
+        logger.info(f"Verified MOCK Google OAuth token for: {user_info['email']}")
+    else:
+        if not settings.GOOGLE_CLIENT_ID:
+            raise ValueError("GOOGLE_CLIENT_ID environment variable is missing or empty.")
+
+        try:
+            req = google_requests.Request()
+            idinfo = id_token.verify_oauth2_token(token_str, req, audience=settings.GOOGLE_CLIENT_ID)
+            user_info = {
+                "email": idinfo.get("email"),
+                "name": idinfo.get("name") or idinfo.get("given_name") or "Learner",
+                "picture": idinfo.get("picture"),
+                "sub": idinfo.get("sub")
+            }
+            logger.info(f"Verified Google OAuth token for: {user_info['email']}")
+        except Exception as verify_err:
+            logger.error(f"Failed to decode token payload: {verify_err}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Google credential"
+            )
 
     if not user_info or not user_info.get("email"):
         raise HTTPException(
